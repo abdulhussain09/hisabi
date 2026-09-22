@@ -21,7 +21,8 @@ import {
     Percent,
     Banknote,
     X,
-    AlertCircle
+    AlertCircle,
+    MapPin
 } from 'lucide-react';
 
 // Memoized Product Card for performance
@@ -83,8 +84,36 @@ const POS = () => {
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerEmail, setCustomerEmail] = useState('');
+    const [customerAddress, setCustomerAddress] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [paidAmount, setPaidAmount] = useState(0);
+
+    // Auto-fill returning customer details when entering phone or email
+    useEffect(() => {
+        const query = (customerPhone || customerEmail || '').trim();
+        if (!query || query.length < 3) return;
+
+        const timer = setTimeout(async () => {
+            try {
+                const res = await api.get(`/customers?search=${encodeURIComponent(query)}`);
+                if (res.data && res.data.length > 0) {
+                    const match = res.data.find(c => 
+                        (c.phone && c.phone.trim() === customerPhone.trim()) ||
+                        (c.email && c.email.trim().toLowerCase() === customerEmail.trim().toLowerCase())
+                    ) || res.data[0];
+
+                    if (match) {
+                        if (match.name && !customerName) setCustomerName(match.name);
+                        if (match.phone && !customerPhone) setCustomerPhone(match.phone);
+                        if (match.email && !customerEmail) setCustomerEmail(match.email);
+                        if (match.address && !customerAddress) setCustomerAddress(match.address);
+                    }
+                }
+            } catch { /* silent */ }
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [customerPhone, customerEmail]);
 
     // Discount States
     const [discount, setDiscount] = useState(0);
@@ -226,6 +255,7 @@ const POS = () => {
                 customer_name: customerName || t('pos.customer_name_default'),
                 customer_phone: customerPhone,
                 customer_email: customerEmail,
+                customer_address: customerAddress,
                 discount: totalDiscount,
                 paid_amount: paidAmount || grandTotal, // Default to grand total if 0
                 payment_method: paymentMethod,
@@ -236,6 +266,7 @@ const POS = () => {
             setCustomerName('');
             setCustomerPhone('');
             setCustomerEmail('');
+            setCustomerAddress('');
             setDiscount(0);
             setPaidAmount(0);
             setAppliedDiscountCode(null);
@@ -410,6 +441,16 @@ const POS = () => {
                                     onChange={(e) => setCustomerEmail(e.target.value)}
                                 />
                             </div>
+                        </div>
+                        <div className="relative">
+                            <MapPin className={`absolute ${isRTL ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400`} />
+                            <input
+                                type="text"
+                                placeholder="Complete Delivery Address"
+                                className={`w-full ${isRTL ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-400 shadow-sm transition-all`}
+                                value={customerAddress}
+                                onChange={(e) => setCustomerAddress(e.target.value)}
+                            />
                         </div>
                     </div>
                 </div>
@@ -720,6 +761,13 @@ const POS = () => {
                                 onChange={(e) => setCustomerEmail(e.target.value)}
                             />
                         </div>
+                        <input
+                            type="text"
+                            placeholder="Complete Delivery Address"
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-400 transition-all"
+                            value={customerAddress}
+                            onChange={(e) => setCustomerAddress(e.target.value)}
+                        />
                     </div>
 
                     {/* Cart Items + Summary — scrollable */}

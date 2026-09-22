@@ -10,7 +10,9 @@ const listCustomers = async (req, res) => {
                 shop_id,
                 [Op.or]: [
                     { name: { [Op.iLike]: `%${search}%` } },
-                    { phone: { [Op.iLike]: `%${search}%` } }
+                    { phone: { [Op.iLike]: `%${search}%` } },
+                    { email: { [Op.iLike]: `%${search}%` } },
+                    { address: { [Op.iLike]: `%${search}%` } }
                 ]
             },
             order: [['name', 'ASC']]

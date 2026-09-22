@@ -195,10 +195,62 @@ const login = async (req, res) => {
         };
 
         res.json(responseData);
-
     } catch (error) {
         console.error('Login Error:', error);
         res.status(500).json({ error: 'Login failed' });
+    }
+};
+
+const demoLogin = async (req, res) => {
+    try {
+        const demoUsername = 'demo_user';
+        let user = await User.findOne({ where: { username: demoUsername }, include: [Shop] });
+        
+        if (!user) {
+            const shop = await Shop.create({
+                name: 'Demo Retail Store',
+                currency: 'AED',
+                country: 'AE',
+                vat_enabled: true,
+                plan: 'free',
+                brand_color: '#2563eb'
+            });
+            
+            const hashedPassword = await hashPassword('DemoPass123!');
+            user = await User.create({
+                shop_id: shop.id,
+                username: demoUsername,
+                password_hash: hashedPassword,
+                role: 'admin'
+            });
+            user.Shop = shop;
+        }
+
+        const shop = user.Shop || await Shop.findByPk(user.shop_id);
+        const token = generateToken({ id: user.id, shop_id: shop.id, role: user.role });
+
+        res.json({
+            message: 'Demo login successful',
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                shop_id: shop.id
+            },
+            shop: {
+                id: shop.id,
+                name: shop.name,
+                currency: shop.currency,
+                country: shop.country,
+                vat_enabled: shop.vat_enabled,
+                plan: shop.plan,
+                brand_logo: shop.brand_logo
+            }
+        });
+    } catch (error) {
+        console.error('Demo Login Error:', error);
+        res.status(500).json({ error: 'Demo login failed' });
     }
 };
 
@@ -319,14 +371,6 @@ const updateProfile = async (req, res) => {
         if (!user || !shop) {
             return res.status(404).json({ error: 'User or Shop not found' });
         }
-        // The provided code snippet seems to be intended for a different controller (e.g., superAdminController)
-        // as it references `req.superAdmin.username`, `id` (instead of `shop_id`), `active`, and `plan`
-        // in a context that doesn't align with `authController.js`'s `updateProfile` function.
-        // Applying it directly would result in a syntactically incorrect file due to undefined variables
-        // and incorrect logic for this specific function.
-        // Therefore, the requested change cannot be applied faithfully and correctly to this file.
-        // If the intention was to add a log for profile updates, it would need to be adapted.
-        // For example: console.log(`[Profile Update] User ${user_id} updated profile for shop ${shop_id}`);
 
         // Update User details
         if (username) user.username = username;
@@ -384,6 +428,7 @@ const updateProfile = async (req, res) => {
 module.exports = {
     register,
     login,
+    demoLogin,
     createStaff,
     getStaff,
     deleteStaff,

@@ -97,9 +97,7 @@ const Profile = () => {
             });
             if (logoFile) formData.append('brand_logo', logoFile);
 
-            const response = await api.put('/auth/profile', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            const response = await api.put('/auth/profile', formData);
             setStatus({ type: 'success', message: 'Profile updated successfully!' });
 
             if (setUser) {
@@ -289,8 +287,8 @@ const Profile = () => {
                                 <div className="flex items-center gap-6">
                                     <div className="w-24 h-24 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden relative group/logo cursor-pointer">
                                         {logoPreview ? <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2" /> : <Upload className="w-8 h-8 text-slate-300" />}
-                                        <input type="file" accept="image/*" onChange={handleLogoChange} className="absolute inset-0 opacity-0 cursor-pointer" />
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/logo:opacity-100 flex items-center justify-center transition-opacity"><Upload className="w-6 h-6 text-white" /></div>
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/logo:opacity-100 flex items-center justify-center transition-opacity pointer-events-none"><Upload className="w-6 h-6 text-white" /></div>
+                                        <input type="file" accept="image/*" onChange={handleLogoChange} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-xs font-bold text-slate-700">PNG, JPG or SVG</p>

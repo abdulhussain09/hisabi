@@ -63,6 +63,14 @@ const Invoice = sequelize.define('Invoice', {
         type: DataTypes.STRING,
         allowNull: true
     },
+    customer_address: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    customer_id: {
+        type: DataTypes.UUID,
+        allowNull: true
+    },
     discount: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false,

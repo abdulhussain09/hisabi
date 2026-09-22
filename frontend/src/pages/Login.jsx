@@ -7,6 +7,7 @@ import {
     Coins, Percent, ArrowRight, CheckCircle2,
     AlertCircle, Loader2
 } from 'lucide-react';
+import DemoLoginButton from '../components/DemoLoginButton';
 
 const Login = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -352,6 +353,17 @@ const Login = () => {
                             )}
                         </button>
                     </form>
+
+                    {isLogin && (
+                        <div className="mt-4">
+                            <div className="relative flex items-center gap-3 mb-3">
+                                <div className="flex-1 h-px bg-gray-200" />
+                                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">or</span>
+                                <div className="flex-1 h-px bg-gray-200" />
+                            </div>
+                            <DemoLoginButton />
+                        </div>
+                    )}
 
                     <p className="mt-8 text-center text-gray-400 font-bold text-sm">
                         Smart retail management by <span className="text-gray-900">Hisabi-POS Tech</span>

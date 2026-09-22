@@ -112,6 +112,10 @@ const generateInvoicePDF = (invoice, shop) => {
         }
         if (invoice.customer_email) {
             doc.text(`Email: ${invoice.customer_email}`, 40, custY);
+            custY += 12;
+        }
+        if (invoice.customer_address) {
+            doc.text(`Address: ${invoice.customer_address}`, 40, custY, { width: 220 });
         }
 
         // ── Payment Highlight Line ──────────────────────────────────────────

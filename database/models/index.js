@@ -66,6 +66,10 @@ InvoiceItem.belongsTo(Product, { foreignKey: 'product_id' });
 Shop.hasMany(Customer, { foreignKey: 'shop_id' });
 Customer.belongsTo(Shop, { foreignKey: 'shop_id', onDelete: 'CASCADE' });
 
+// Customer ↔ Invoice
+Customer.hasMany(Invoice, { foreignKey: 'customer_id' });
+Invoice.belongsTo(Customer, { foreignKey: 'customer_id', onDelete: 'SET NULL' });
+
 // Shop ↔ Supplier
 Shop.hasMany(Supplier, { foreignKey: 'shop_id' });
 Supplier.belongsTo(Shop, { foreignKey: 'shop_id', onDelete: 'CASCADE' });
@@ -118,6 +122,50 @@ DuePayment.belongsTo(Invoice, { foreignKey: 'invoice_id' });
 // ─── Database Sync ────────────────────────────────────────────────────
 const syncDatabase = async () => {
     try {
+        // Pre-sync migrations: fix known column type issues before Sequelize alter runs
+        try {
+            // Fix: shops.plan VARCHAR -> ENUM cast (PostgreSQL cannot auto-cast default)
+            await sequelize.query(`
+                DO $$
+                BEGIN
+                    -- Only migrate if the column is still VARCHAR (not already an enum)
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'shops' AND column_name = 'plan'
+                        AND data_type = 'character varying'
+                    ) THEN
+                        -- Ensure the enum type exists
+                        BEGIN
+                            CREATE TYPE "public"."enum_shops_plan" AS ENUM ('free', 'gold', 'premium');
+                        EXCEPTION WHEN duplicate_object THEN NULL;
+                        END;
+
+                        -- Drop default, cast type, restore default
+                        ALTER TABLE "shops" ALTER COLUMN "plan" DROP DEFAULT;
+                        ALTER TABLE "shops" ALTER COLUMN "plan"
+                            TYPE "public"."enum_shops_plan"
+                            USING "plan"::"public"."enum_shops_plan";
+                        ALTER TABLE "shops" ALTER COLUMN "plan"
+                            SET DEFAULT 'free'::"public"."enum_shops_plan";
+                        ALTER TABLE "shops" ALTER COLUMN "plan" SET NOT NULL;
+                    END IF;
+                END$$;
+            `);
+        } catch (e) {
+            // Non-fatal: log and continue so server still starts
+            console.warn('Pre-sync migration warning (plan enum):', e.message);
+        }
+
+        try {
+            await sequelize.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_address TEXT;');
+            await sequelize.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_id UUID;');
+        } catch { /* silent fallback */ }
+
+        // Fix: drop duplicate unique index on users.username before Sequelize recreates it
+        try {
+            await sequelize.query('DROP INDEX IF EXISTS "users_username";');
+        } catch { /* silent fallback */ }
+
         await sequelize.sync({ alter: true });
         console.log('Database synced successfully.');
     } catch (error) {
