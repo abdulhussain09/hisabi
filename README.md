@@ -232,6 +232,6 @@ copyright notice and this permission notice appear in all copies.
 
 ---
 
-<p align="center">
+<p align-items="center">
   <sub>Built with ❤️ for the future of modern retail by the <b>Hisabi-POS Engineering Team</b></sub>
 </p>
