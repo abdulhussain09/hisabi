@@ -23,7 +23,6 @@ Engineered with a **multi-region architecture** (supporting Gulf Cooperation Cou
 - [Getting Started & Local Setup](#-getting-started--local-setup)
 - [Environment Variables](#-environment-variables)
 - [Security & Production Readiness](#-security--production-readiness)
-- [Documentation & Resources](#-documentation--resources)
 - [License](#-license)
 
 ---
@@ -113,8 +112,6 @@ hisabi/
 │   └── database/             # Relational data layer
 │       ├── database.js       # Sequelize PostgreSQL connection pool
 │       └── models/           # Models (Product, Shop, User, Invoice, Advertisement, etc.)
-├── docs/                     # Technical documentation & developer guides
-│   └── HISABI_COMPLETE_DEVELOPER_GUIDE.md
 ├── frontend/
 │   ├── src/
 │   │   ├── components/       # Reusable UI (Modals, Charts, Sidebar, Topbar)
@@ -123,7 +120,6 @@ hisabi/
 │   │   └── public/locales/   # i18n translation dictionaries (en, ar)
 │   ├── index.html            # Main HTML entrypoint
 │   └── vite.config.js        # Vite bundler configuration
-├── FEATURES_AND_ARCHITECTURE.md
 └── README.md
 ```
 
@@ -208,13 +204,6 @@ VITE_API_URL=http://localhost:5000
 * **Input Sanitization**: Request parameters and payloads validated with Joi schemas prior to database operations.
 * **HTTP Security Headers**: Configured with `helmet` for cross-origin security policies and frame protection.
 * **Rate Limiting & Payload Defense**: Express body limits raised to `10mb` exclusively for authorized base64 media uploads while safeguarding JSON endpoints against DOS.
-
----
-
-## 📚 Documentation & Resources
-
-* 📖 **[FEATURES_AND_ARCHITECTURE.md](file:///home/abdul/Documents/Hisabi/FEATURES_AND_ARCHITECTURE.md)** — Comprehensive architecture breakdown, database entity relationships, and module specifications.
-* 📚 **[HISABI_COMPLETE_DEVELOPER_GUIDE.md](file:///home/abdul/Documents/Hisabi/docs/HISABI_COMPLETE_DEVELOPER_GUIDE.md)** — Complete developer guide detailing setup, API routes, middleware details, and design system.
 
 ---
 
