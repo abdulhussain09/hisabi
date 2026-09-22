@@ -43,7 +43,7 @@ const ProductCard = memo(({ product, currency, isRTL, onAdd, t }) => {
 
             <div className="aspect-square bg-slate-50 rounded-xl overflow-hidden mb-3 border border-slate-100 flex items-center justify-center p-2 group-hover:bg-blue-50/50 transition-colors">
                 {product.image_path ? (
-                    <img src={getImageUrl(product.image_path)} alt={product.name} className="w-full h-full object-contain" loading="lazy" />
+                    <img src={getImageUrl(product.image_path)} alt={product.name} className="w-full h-full object-contain" loading="lazy" onError={(e) => { e.target.style.display = 'none'; }} />
                 ) : (
                     <Package className="w-10 h-10 text-slate-200" />
                 )}
@@ -422,7 +422,7 @@ const POS = () => {
                             <div key={item.product_id} className="flex gap-4 p-3 bg-white border border-slate-100 rounded-2xl items-center hover:border-blue-200 transition-colors group">
                                 <div className="w-12 h-12 rounded-lg bg-slate-50 flex-shrink-0 border border-slate-100 overflow-hidden">
                                     {item.image_path ? (
-                                        <img src={getImageUrl(item.image_path)} alt={item.name} className="w-full h-full object-cover" />
+                                        <img src={getImageUrl(item.image_path)} alt={item.name} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-slate-200">
                                             <Package className="w-6 h-6" />
@@ -730,7 +730,7 @@ const POS = () => {
                                 <div key={item.product_id} className="flex gap-3 p-2.5 bg-white border border-slate-100 rounded-xl items-center">
                                     <div className="w-10 h-10 rounded-lg bg-slate-50 flex-shrink-0 border border-slate-100 overflow-hidden">
                                         {item.image_path ? (
-                                            <img src={getImageUrl(item.image_path)} alt={item.name} className="w-full h-full object-cover" />
+                                            <img src={getImageUrl(item.image_path)} alt={item.name} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-slate-200">
                                                 <Package className="w-5 h-5" />

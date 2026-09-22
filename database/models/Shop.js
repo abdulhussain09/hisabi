@@ -56,7 +56,7 @@ const Shop = sequelize.define('Shop', {
         defaultValue: 'free'
     },
     brand_logo: {
-        type: DataTypes.STRING(500),
+        type: DataTypes.TEXT,
         allowNull: true
     },
     brand_color: {

@@ -12,7 +12,7 @@ const Advertisement = sequelize.define('Advertisement', {
         allowNull: true
     },
     image_url: {
-        type: DataTypes.STRING(500),
+        type: DataTypes.TEXT,
         allowNull: false
     },
     link_url: {

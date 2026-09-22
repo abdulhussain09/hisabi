@@ -175,7 +175,9 @@ const SuperAdminDashboard = () => {
 
     const getImageUrl = (url) => {
         if (!url) return '';
-        if (url.startsWith('http')) return url;
+        if (typeof url === 'string' && (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://'))) {
+            return url;
+        }
         return `${IMAGE_BASE_URL}${url}`;
     };
 

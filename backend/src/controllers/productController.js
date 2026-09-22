@@ -3,6 +3,7 @@ const { sequelize } = require('../../../database/database');
 const { Product, BundleItem, Shop } = require('../../../database/models');
 const { Op } = require('sequelize');
 const { getPlanLimits } = require('../middleware/planMiddleware');
+const uploadMiddleware = require('../middleware/upload');
 
 const productSchema = Joi.object({
     name: Joi.string().required(),
@@ -90,7 +91,7 @@ const createProduct = async (req, res) => {
         
         // Parse bundle_items if sent as string (multipart/form-data limitation)
         let { name, barcode, cost_price, selling_price, stock_quantity, mrp, is_bundle, bundle_items, category_id } = req.body;
-        const image_path = req.file ? `/uploads/${req.file.filename}` : null;
+        const image_path = req.file ? uploadMiddleware.processImageToDataUri(req.file, 'product') : null;
 
         if (typeof bundle_items === 'string') {
             try {
@@ -168,8 +169,11 @@ const updateProduct = async (req, res) => {
         const shop_id = req.user.shop_id;
         const { id } = req.params;
         
-        let { name, barcode, cost_price, selling_price, stock_quantity, mrp, is_bundle, bundle_items, category_id } = req.body;
-        const image_path = req.file ? `/uploads/${req.file.filename}` : undefined;
+        let { name, barcode, cost_price, selling_price, stock_quantity, mrp, is_bundle, bundle_items, category_id, remove_image } = req.body;
+        let image_path = req.file ? uploadMiddleware.processImageToDataUri(req.file, 'product') : undefined;
+        if (!req.file && (remove_image === 'true' || remove_image === true)) {
+            image_path = null;
+        }
 
         if (typeof bundle_items === 'string') {
             try {
@@ -210,7 +214,7 @@ const updateProduct = async (req, res) => {
             stock_quantity: (is_bundle || product.is_bundle) ? 0 : stock_quantity,
             mrp,
             ...(is_bundle !== undefined && { is_bundle }),
-            ...(image_path && { image_path }),
+            ...(image_path !== undefined && { image_path }),
             ...(category_id !== undefined && { category_id: category_id || null })
         }, { transaction: t });
 

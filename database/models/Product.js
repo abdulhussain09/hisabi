@@ -40,7 +40,7 @@ const Product = sequelize.define('Product', {
         defaultValue: 0
     },
     image_path: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
         allowNull: true
     },
     category_id: {

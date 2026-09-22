@@ -61,12 +61,21 @@ app.use(morgan('dev'));
 // This must come BEFORE express.json()
 app.use('/api/razorpay/webhook', express.raw({ type: 'application/json' }));
 
-app.use(express.json({ limit: '100kb' }));
-const os = require('os');
-const uploadDir = process.env.VERCEL
-    ? path.join(os.tmpdir(), 'uploads')
-    : path.join(__dirname, '../uploads');
-app.use('/uploads', express.static(uploadDir));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+const uploadMiddleware = require('./middleware/upload');
+app.use('/uploads', express.static(uploadMiddleware.uploadDir));
+
+// Fallback for legacy uploads if missing from disk
+const placeholderSvg = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`
+);
+app.use('/uploads', (req, res) => {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(placeholderSvg);
+});
 
 const { authenticate, requireAdmin } = require('./middleware/auth');
 

@@ -9,7 +9,9 @@ export const IMAGE_BASE_URL = BASE_URL;
 
 export const getImageUrl = (path) => {
     if (!path) return null;
-    if (path.startsWith('http')) return path;
+    if (typeof path === 'string' && (path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://'))) {
+        return path;
+    }
     const base = IMAGE_BASE_URL.endsWith('/') ? IMAGE_BASE_URL.slice(0, -1) : IMAGE_BASE_URL;
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     return `${base}${normalizedPath}`;

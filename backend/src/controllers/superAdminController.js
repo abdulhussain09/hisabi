@@ -5,6 +5,7 @@ const {
 const { Op } = require('sequelize');
 const { hashPassword, comparePassword } = require('../utils/hash');
 const { generateToken } = require('../utils/token');
+const uploadMiddleware = require('../middleware/upload');
 
 // Helper for Activity Logging
 const logActivity = async (adminUsername, action, category = 'SYSTEM', details = {}) => {
@@ -336,7 +337,7 @@ const createAd = async (req, res) => {
     try {
         const adData = { ...req.body };
         if (req.file) {
-            adData.image_url = `/uploads/${req.file.filename}`;
+            adData.image_url = uploadMiddleware.processImageToDataUri(req.file, 'ad');
         }
         if (adData.expires_at === '') adData.expires_at = null;
         
@@ -357,7 +358,7 @@ const updateAd = async (req, res) => {
         
         const updateData = { ...req.body };
         if (req.file) {
-            updateData.image_url = `/uploads/${req.file.filename}`;
+            updateData.image_url = uploadMiddleware.processImageToDataUri(req.file, 'ad');
         }
         if (updateData.expires_at === '') updateData.expires_at = null;
         

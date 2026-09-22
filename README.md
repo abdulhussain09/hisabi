@@ -2,7 +2,8 @@
 
 **Hisabi-POS** is a high-performance, full-stack SaaS Point of Sale and inventory management system designed for modern retail environments. Originally built for the UAE and Kuwait, it now features a specialized expansion for the **Indian market**, including GST compliance and localized payment processing.
 
-🌐 **Live:** *Deployed & Live (Frontend: Cloudflare Pages | Backend: Render)*
+🌐 **Live:** *Deployed & Live (Frontend: Cloudflare Pages | Backend: Render)*  
+📖 **Full Technical Architecture & Features Guide:** [FEATURES_AND_ARCHITECTURE.md](file:///home/abdul/Documents/Hisabi/FEATURES_AND_ARCHITECTURE.md)
 
 ---
 

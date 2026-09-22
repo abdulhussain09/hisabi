@@ -3,6 +3,7 @@ const { sequelize } = require('../../../database/database');
 const { Shop, User } = require('../../../database/models');
 const { hashPassword, comparePassword } = require('../utils/hash');
 const { generateToken } = require('../utils/token');
+const uploadMiddleware = require('../middleware/upload');
 
 const registerSchema = Joi.object({
     shop_name: Joi.string().required(),
@@ -343,7 +344,7 @@ const updateProfile = async (req, res) => {
 
         // Handle file upload for logo
         if (req.file) {
-            shop.brand_logo = `/uploads/${req.file.filename}`;
+            shop.brand_logo = uploadMiddleware.processImageToDataUri(req.file, 'logo');
         } else if (brand_logo !== undefined) {
             shop.brand_logo = brand_logo;
         }
