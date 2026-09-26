@@ -34,16 +34,16 @@ const Invoice = sequelize.define('Invoice', {
         defaultValue: DataTypes.NOW
     },
     subtotal: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false
     },
     tax_total: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false,
         defaultValue: 0
     },
     grand_total: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false
     },
     status: {
@@ -72,19 +72,23 @@ const Invoice = sequelize.define('Invoice', {
         allowNull: true
     },
     discount: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false,
         defaultValue: 0
     },
     paid_amount: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false,
         defaultValue: 0
     },
     due_amount: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false,
         defaultValue: 0
+    },
+    qr_code_data: {
+        type: DataTypes.TEXT,
+        allowNull: true
     }
 }, {
     tableName: 'invoices',

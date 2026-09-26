@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
     Store, User, Lock, MapPin, Hash,
@@ -365,8 +365,13 @@ const Login = () => {
                         </div>
                     )}
 
-                    <p className="mt-8 text-center text-gray-400 font-bold text-sm">
+                    <p className="mt-6 text-center text-gray-400 font-bold text-sm">
                         Smart retail management by <span className="text-gray-900">Hisabi-POS Tech</span>
+                    </p>
+                    <p className="mt-2 text-center text-xs text-gray-400">
+                        <Link to="/privacy" className="hover:text-blue-600 transition-colors">Privacy Policy</Link>
+                        <span className="mx-2">·</span>
+                        <Link to="/terms" className="hover:text-blue-600 transition-colors">Terms &amp; Conditions</Link>
                     </p>
                 </div>
             </div>

@@ -555,7 +555,7 @@ const SuperAdminDashboard = () => {
                                     {ads.map(ad => (
                                         <div key={ad.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden group">
                                             <div className="aspect-video bg-slate-100 relative overflow-hidden">
-                                                <img src={getImageUrl(ad.image_url)} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                <img src={getImageUrl(ad.image_url)} alt={`Ad banner: ${ad.title || 'Advertisement'}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                                 <div className={`absolute top-4 right-4 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${ad.active ? 'bg-emerald-500 text-white' : 'bg-slate-400 text-white'}`}>
                                                     {ad.active ? 'Live' : 'Hidden'}
                                                 </div>
@@ -775,7 +775,7 @@ const SuperAdminDashboard = () => {
                                                         className={`p-4 rounded-3xl border-2 text-left transition-all flex items-center gap-4 ${adForm.template_id === template.id ? 'border-blue-600 bg-blue-50' : 'border-slate-100 hover:border-blue-200'}`}
                                                     >
                                                         <div className="w-16 h-12 bg-slate-200 rounded-xl overflow-hidden shrink-0">
-                                                            <img src={template.image_url} alt="" className="w-full h-full object-cover" />
+                                                            <img src={template.image_url} alt={`Ad template preview: ${template.title}`} className="w-full h-full object-cover" />
                                                         </div>
                                                         <div>
                                                             <p className="text-sm font-black text-slate-900">{template.title}</p>

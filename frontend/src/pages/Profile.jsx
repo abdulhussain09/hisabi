@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api, { IMAGE_BASE_URL } from '../api/axios';
+import api, { IMAGE_BASE_URL, getImageUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import {
     User,
@@ -57,7 +57,7 @@ const Profile = () => {
                 brand_color: shop.brand_color || '#3b82f6',
                 brand_logo: shop.brand_logo || ''
             });
-            if (shop.brand_logo) setLogoPreview(`${IMAGE_BASE_URL}${shop.brand_logo}`);
+            if (shop.brand_logo) setLogoPreview(getImageUrl(shop.brand_logo));
         } catch (error) {
             console.error('Failed to fetch profile', error);
             setStatus({ type: 'error', message: 'Failed to load profile data' });

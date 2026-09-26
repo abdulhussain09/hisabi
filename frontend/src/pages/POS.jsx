@@ -2,6 +2,14 @@ import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import api, { IMAGE_BASE_URL, getImageUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { formatCurrency } from '../utils/currencyUtils';
+import {
+    cacheProducts,
+    getCachedProducts,
+    queueOfflineInvoice,
+    getPendingOfflineInvoices,
+    removeOfflineInvoice
+} from '../utils/offlineStore';
 import {
     Search,
     Plus,
@@ -22,7 +30,8 @@ import {
     Banknote,
     X,
     AlertCircle,
-    MapPin
+    MapPin,
+    WifiOff
 } from 'lucide-react';
 
 // Memoized Product Card for performance
@@ -54,9 +63,9 @@ const ProductCard = memo(({ product, currency, isRTL, onAdd, t }) => {
 
             <div className="mt-auto pt-2 flex items-center justify-between">
                 <div className="flex flex-col">
-                    <span className="text-sm font-black text-slate-900">{currency} {parseFloat(product.selling_price).toFixed(2)}</span>
+                    <span className="text-sm font-black text-slate-900">{formatCurrency(product.selling_price, currency, true)}</span>
                     {product.mrp && parseFloat(product.mrp) > parseFloat(product.selling_price) && (
-                        <span className="text-[10px] text-slate-400 line-through decoration-red-400/50 font-bold">{currency} {parseFloat(product.mrp).toFixed(2)}</span>
+                        <span className="text-[10px] text-slate-400 line-through decoration-red-400/50 font-bold">{formatCurrency(product.mrp, currency, true)}</span>
                     )}
                 </div>
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-all shadow-sm">
@@ -138,12 +147,40 @@ const POS = () => {
                 ]);
                 setProducts(prodRes.data);
                 setCategories(catRes.data);
+                cacheProducts(prodRes.data);
             } catch (err) {
-                console.error('Failed to load POS data', err);
+                console.warn('Network error loading POS data, using offline cached products if available', err);
+                const cached = await getCachedProducts();
+                if (cached && cached.length > 0) {
+                    setProducts(cached);
+                }
             }
         };
         loadInitialData();
     }, [search, selectedCategory]);
+
+    useEffect(() => {
+        const handleOnline = async () => {
+            try {
+                const pending = await getPendingOfflineInvoices();
+                if (pending && pending.length > 0) {
+                    const invoicesData = pending.map(item => item.data);
+                    await api.post('/invoices/sync-offline', { invoices: invoicesData });
+                    for (const item of pending) {
+                        await removeOfflineInvoice(item.client_id);
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to sync offline invoices on reconnect', e);
+            }
+        };
+
+        window.addEventListener('online', handleOnline);
+        if (navigator.onLine) {
+            handleOnline();
+        }
+        return () => window.removeEventListener('online', handleOnline);
+    }, []);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -212,7 +249,7 @@ const POS = () => {
     // Calculations
     const subtotal = useMemo(() => cart.reduce((acc, item) => acc + (item.price * item.quantity), 0), [cart]);
 
-    // Regional Logic: VAT only for AED
+    // Regional Logic: VAT only for AED (5%)
     const vatRate = currency === 'AED' ? 0.05 : 0;
     const vatValue = useMemo(() => subtotal * vatRate, [subtotal, vatRate]);
 
@@ -236,31 +273,48 @@ const POS = () => {
     const grandTotal = useMemo(() => Math.max(0, subtotal + vatValue - totalDiscount), [subtotal, vatValue, totalDiscount]);
     const dueAmount = useMemo(() => Math.max(0, grandTotal - paidAmount), [grandTotal, paidAmount]);
 
-    // Auto-fill paid amount when total changes (if not partial)
-    useEffect(() => {
-        if (paidAmount === 0 || paidAmount > 0) {
-            // We don't auto-reset to allow partial entry, but we can have a button to mark as fully paid
-        }
-    }, [grandTotal]);
-
     const handleCheckout = async () => {
         if (cart.length === 0) return;
         setLoading(true);
-        try {
-            const response = await api.post('/invoices', {
-                items: cart.map(item => ({
-                    product_id: item.product_id,
-                    quantity: item.quantity
-                })),
-                customer_name: customerName || t('pos.customer_name_default'),
-                customer_phone: customerPhone,
-                customer_email: customerEmail,
-                customer_address: customerAddress,
-                discount: totalDiscount,
-                paid_amount: paidAmount || grandTotal, // Default to grand total if 0
-                payment_method: paymentMethod,
-                discount_code: appliedDiscountCode?.code?.code
+
+        const payload = {
+            items: cart.map(item => ({
+                product_id: item.product_id,
+                quantity: item.quantity
+            })),
+            customer_name: customerName || t('pos.customer_name_default'),
+            customer_phone: customerPhone,
+            customer_email: customerEmail,
+            customer_address: customerAddress,
+            discount: totalDiscount,
+            paid_amount: paidAmount || grandTotal,
+            payment_method: paymentMethod,
+            discount_code: appliedDiscountCode?.code?.code
+        };
+
+        if (!navigator.onLine) {
+            await queueOfflineInvoice(payload);
+            setInvoice({
+                invoice_number: `OFF-${Date.now().toString().slice(-6)}`,
+                grand_total: grandTotal,
+                paid_amount: paidAmount || grandTotal,
+                due_amount: dueAmount,
+                is_offline: true
             });
+            setCart([]);
+            setCustomerName('');
+            setCustomerPhone('');
+            setCustomerEmail('');
+            setCustomerAddress('');
+            setDiscount(0);
+            setPaidAmount(0);
+            setAppliedDiscountCode(null);
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const response = await api.post('/invoices', payload);
             setInvoice(response.data);
             setCart([]);
             setCustomerName('');
@@ -271,7 +325,26 @@ const POS = () => {
             setPaidAmount(0);
             setAppliedDiscountCode(null);
         } catch (error) {
-            alert(error.response?.data?.error || t('pos.errors.checkout_failed'));
+            if (!error.response) {
+                await queueOfflineInvoice(payload);
+                setInvoice({
+                    invoice_number: `OFF-${Date.now().toString().slice(-6)}`,
+                    grand_total: grandTotal,
+                    paid_amount: paidAmount || grandTotal,
+                    due_amount: dueAmount,
+                    is_offline: true
+                });
+                setCart([]);
+                setCustomerName('');
+                setCustomerPhone('');
+                setCustomerEmail('');
+                setCustomerAddress('');
+                setDiscount(0);
+                setPaidAmount(0);
+                setAppliedDiscountCode(null);
+            } else {
+                alert(error.response?.data?.error || t('pos.errors.checkout_failed'));
+            }
         } finally {
             setLoading(false);
         }
@@ -291,39 +364,46 @@ const POS = () => {
                     <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
                     <h2 className="text-2xl font-black text-slate-900">{t('pos.complete_transaction')}</h2>
                     <p className="text-slate-500 mt-1 font-bold">#{invoice.invoice_number}</p>
+                    {invoice.is_offline && (
+                        <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-full text-xs font-bold">
+                            <WifiOff className="w-3.5 h-3.5" /> Saved Offline (Will Sync Auto)
+                        </div>
+                    )}
 
                     <div className="my-6 p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
                         <div className="flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
                             <span>{t('pos.grand_total')}</span>
-                            <span className="text-slate-900">{currency} {parseFloat(invoice.grand_total).toFixed(2)}</span>
+                            <span className="text-slate-900">{formatCurrency(invoice.grand_total, currency, true)}</span>
                         </div>
                         <div className="flex justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
                             <span>{t('pos.paid')}</span>
-                            <span className="text-emerald-600">{currency} {parseFloat(invoice.paid_amount).toFixed(2)}</span>
+                            <span className="text-emerald-600">{formatCurrency(invoice.paid_amount, currency, true)}</span>
                         </div>
                         {parseFloat(invoice.due_amount) > 0 && (
                             <div className="flex justify-between items-center text-[10px] font-black text-red-400 uppercase tracking-widest">
                                 <span>{t('pos.due')}</span>
-                                <span className="text-red-600">{currency} {parseFloat(invoice.due_amount).toFixed(2)}</span>
+                                <span className="text-red-600">{formatCurrency(invoice.due_amount, currency, true)}</span>
                             </div>
                         )}
                     </div>
 
                     <div className="space-y-3">
-                        <button 
-                            onClick={async () => {
-                                try {
-                                    const res = await api.get(`/invoices/${invoice.id}/pdf`, { responseType: 'blob' });
-                                    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-                                    window.open(url, '_blank');
-                                } catch (err) {
-                                    alert(t('invoices.errors.download_failed'));
-                                }
-                            }}
-                            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 transition-all"
-                        >
-                            <Printer className="w-4 h-4" /> {t('pos.print_receipt')}
-                        </button>
+                        {!invoice.is_offline && (
+                            <button 
+                                onClick={async () => {
+                                    try {
+                                        const res = await api.get(`/invoices/${invoice.id}/pdf`, { responseType: 'blob' });
+                                        const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+                                        window.open(url, '_blank');
+                                    } catch (err) {
+                                        alert(t('invoices.errors.download_failed'));
+                                    }
+                                }}
+                                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 transition-all"
+                            >
+                                <Printer className="w-4 h-4" /> {t('pos.print_receipt')}
+                            </button>
+                        )}
                         <button className="w-full py-4 bg-white border border-slate-200 text-slate-900 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-50 transition-all" onClick={resetPOS}>
                             {t('pos.new_transaction')}
                         </button>

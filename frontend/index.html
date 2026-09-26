@@ -2,13 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
     <!-- Primary Meta Tags -->
     <title>Hisabi-POS | Complete Inventory & Billing Solution</title>
     <meta name="title" content="Hisabi-POS | Complete Inventory & Billing Solution" />
-    <meta name="description" content="Manage your shop with Hisabi-POS. Fast inventory tracking, GST/VAT billing, customer management, and sales analytics in one beautiful dashboard." />
+    <meta id="meta-description" name="description" content="Manage your shop with Hisabi-POS. Fast inventory tracking, GST/VAT billing, customer management, and sales analytics in one beautiful dashboard." />
     <meta name="keywords" content="POS system, inventory management, billing software, retail management, Hisabi, shop management" />
     <meta name="author" content="Hisabi Team" />
     
@@ -27,6 +27,25 @@
     <!-- Performance: Preconnect to external origins -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Privacy-First Consent Aware Analytics Loader -->
+    <script>
+      (function() {
+        var consent = localStorage.getItem('hisabi_cookie_consent');
+        var gaId = window.VITE_GA_MEASUREMENT_ID || 'G-MEASUREMENT-ID';
+        if (consent === 'accepted' && gaId && gaId !== 'G-MEASUREMENT-ID') {
+          var script = document.createElement('script');
+          script.async = true;
+          script.src = 'https://www.googletagmanager.com/gtag/js?id=' + gaId;
+          document.head.appendChild(script);
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          window.gtag = gtag;
+          gtag('js', new Date());
+          gtag('config', gaId);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

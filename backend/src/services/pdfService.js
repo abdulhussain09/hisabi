@@ -1,4 +1,5 @@
 const PDFDocument = require('pdfkit');
+const { createQRMatrix, matrixToBMPBuffer } = require('../utils/qrGenerator');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,11 @@ function formatDate(dateStr) {
     return new Date(dateStr).toLocaleDateString('en-GB', {
         day: '2-digit', month: '2-digit', year: 'numeric'
     });
+}
+
+function formatDec(amount, currency = 'AED') {
+    const decimals = currency === 'KWD' ? 3 : 2;
+    return parseFloat(amount || 0).toFixed(decimals);
 }
 
 function hexToRgb(hex) {
@@ -50,11 +56,30 @@ const generateInvoicePDF = (invoice, shop) => {
         const date = formatDate(invoice.date);
         const time = new Date(invoice.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
+        const primaryColor = (shop && shop.brand_color) ? shop.brand_color : '#4f46e5';
+
         // ── Header bar ──────────────────────────────────────────────────────
+        let textLeftMargin = 40;
+        if (shop.brand_logo && typeof shop.brand_logo === 'string') {
+            try {
+                let imgBuf = null;
+                if (shop.brand_logo.startsWith('data:image/')) {
+                    const base64Data = shop.brand_logo.split(',')[1];
+                    if (base64Data) imgBuf = Buffer.from(base64Data, 'base64');
+                }
+                if (imgBuf) {
+                    doc.image(imgBuf, 40, 35, { fit: [50, 50] });
+                    textLeftMargin = 100;
+                }
+            } catch (e) {
+                // Non-fatal if logo rendering fails
+            }
+        }
+
         // Shop name
         doc.fontSize(22).font('Helvetica-Bold');
-        setColor(doc, PRIMARY);
-        doc.text(shop.name || 'Shop', 40, 40);
+        setColor(doc, primaryColor);
+        doc.text(shop.name || 'Shop', textLeftMargin, 40);
 
         // Invoice label top-right
         doc.fontSize(20).font('Helvetica-Bold');
@@ -65,16 +90,16 @@ const generateInvoicePDF = (invoice, shop) => {
         doc.fontSize(9).font('Helvetica');
         setColor(doc, TEXT_MUTED);
         let shopY = 68;
-        if (shop.address) { doc.text(shop.address, 40, shopY); shopY += 13; }
+        if (shop.address) { doc.text(shop.address, textLeftMargin, shopY); shopY += 13; }
         if (shop.phone || shop.email) {
-            doc.text([shop.phone, shop.email].filter(Boolean).join('  |  '), 40, shopY);
+            doc.text([shop.phone, shop.email].filter(Boolean).join('  |  '), textLeftMargin, shopY);
             shopY += 13;
         }
         if (isUAE && shop.trn) {
-            doc.font('Helvetica-Bold').text(`TRN: ${shop.trn}`, 40, shopY);
+            doc.font('Helvetica-Bold').text(`TRN: ${shop.trn}`, textLeftMargin, shopY);
             shopY += 13;
         } else if (isIndia && shop.gstin) {
-            doc.font('Helvetica-Bold').text(`GSTIN: ${shop.gstin}`, 40, shopY);
+            doc.font('Helvetica-Bold').text(`GSTIN: ${shop.gstin}`, textLeftMargin, shopY);
             shopY += 13;
         }
 
@@ -91,7 +116,7 @@ const generateInvoicePDF = (invoice, shop) => {
 
         // Divider line under header
         const divY = 125;
-        setStroke(doc, PRIMARY);
+        setStroke(doc, primaryColor);
         doc.moveTo(40, divY).lineTo(40 + pageWidth, divY).lineWidth(2).stroke();
 
         // ── Bill To ─────────────────────────────────────────────────────────
@@ -211,17 +236,17 @@ const generateInvoicePDF = (invoice, shop) => {
 
         const drawTotalRow = (label, value, isFinal = false) => {
             if (isFinal) {
-                setStroke(doc, PRIMARY);
+                setStroke(doc, primaryColor);
                 doc.moveTo(totalsX, totY - 3).lineTo(40 + pageWidth, totY - 3).lineWidth(1.5).stroke();
                 doc.fontSize(13).font('Helvetica-Bold');
-                setColor(doc, PRIMARY);
+                setColor(doc, primaryColor);
             } else {
                 doc.fontSize(10).font('Helvetica');
                 setColor(doc, TEXT_MUTED);
             }
             doc.text(label, totalsX, totY, { width: 140 });
             if (isFinal) {
-                setColor(doc, PRIMARY);
+                setColor(doc, primaryColor);
             } else {
                 setColor(doc, TEXT_MAIN);
             }
@@ -229,15 +254,15 @@ const generateInvoicePDF = (invoice, shop) => {
             totY += isFinal ? 20 : 16;
         };
 
-        drawTotalRow('Subtotal', `${currency} ${parseFloat(invoice.subtotal).toFixed(2)}`);
+        drawTotalRow('Subtotal', `${currency} ${formatDec(invoice.subtotal, currency)}`);
         if (parseFloat(invoice.tax_total) > 0) {
             const taxLabel = isIndia ? 'GST' : (isUAE ? 'VAT (5%)' : 'Tax');
-            drawTotalRow(taxLabel, `${currency} ${parseFloat(invoice.tax_total).toFixed(2)}`);
+            drawTotalRow(taxLabel, `${currency} ${formatDec(invoice.tax_total, currency)}`);
         }
         if (parseFloat(invoice.discount) > 0) {
-            drawTotalRow('Discount', `-${currency} ${parseFloat(invoice.discount).toFixed(2)}`);
+            drawTotalRow('Discount', `-${currency} ${formatDec(invoice.discount, currency)}`);
         }
-        drawTotalRow('Grand Total', `${currency} ${parseFloat(invoice.grand_total).toFixed(2)}`, true);
+        drawTotalRow('Grand Total', `${currency} ${formatDec(invoice.grand_total, currency)}`, true);
 
         // ── Payment info box ──────────────────────────────────────────────────
         totY += 10;
@@ -250,14 +275,25 @@ const generateInvoicePDF = (invoice, shop) => {
         setColor(doc, TEXT_MAIN);
         doc.text('Paid Amount:', totalsX + 10, totY + 8);
         doc.font('Helvetica-Bold');
-        doc.text(`${currency} ${parseFloat(invoice.paid_amount || 0).toFixed(2)}`, totalsX + 10, totY + 8, { width: 230, align: 'right' });
+        doc.text(`${currency} ${formatDec(invoice.paid_amount || 0, currency)}`, totalsX + 10, totY + 8, { width: 230, align: 'right' });
 
         if (parseFloat(invoice.due_amount) > 0) {
             doc.fontSize(10).font('Helvetica');
             doc.fillColor([220, 38, 38]);
             doc.text('Balance Due:', totalsX + 10, totY + 30);
             doc.font('Helvetica-Bold');
-            doc.text(`${currency} ${parseFloat(invoice.due_amount).toFixed(2)}`, totalsX + 10, totY + 30, { width: 230, align: 'right' });
+            doc.text(`${currency} ${formatDec(invoice.due_amount, currency)}`, totalsX + 10, totY + 30, { width: 230, align: 'right' });
+        }
+
+        // ── Render GCC TLV QR Code ─────────────────────────────────────────────
+        if (invoice.qr_code_data) {
+            try {
+                const qrMatrix = createQRMatrix(invoice.qr_code_data);
+                const qrBmp = matrixToBMPBuffer(qrMatrix, 2, 1);
+                doc.image(qrBmp, 40, totY - 10, { width: 75, height: 75 });
+            } catch (e) {
+                // Non-fatal if QR draw fails
+            }
         }
 
         // ── Footer: stamp on page 0 using bufferPages ─────────────────────────
@@ -298,9 +334,11 @@ const generateDueReceiptPDF = (payment, invoice, shop) => {
         const currency = shop.currency || 'AED';
         const date = formatDate(payment.payment_date);
 
+        const primaryColor = (shop && shop.brand_color) ? shop.brand_color : '#4f46e5';
+
         // Header
         doc.fontSize(22).font('Helvetica-Bold');
-        setColor(doc, PRIMARY);
+        setColor(doc, primaryColor);
         doc.text(shop.name || 'Shop', { align: 'center' });
 
         if (shop.address) {
@@ -310,7 +348,7 @@ const generateDueReceiptPDF = (payment, invoice, shop) => {
         }
 
         // Divider
-        setStroke(doc, PRIMARY);
+        setStroke(doc, primaryColor);
         doc.moveTo(60, doc.y + 8).lineTo(60 + pageWidth, doc.y + 8).lineWidth(2).stroke();
         doc.moveDown(1.5);
 
@@ -360,13 +398,13 @@ const generateDueReceiptPDF = (payment, invoice, shop) => {
                 setStroke(doc, BORDER);
                 doc.moveTo(col1 + 10, sumY - 4).lineTo(col1 + boxW - 10, sumY - 4).lineWidth(0.5).stroke();
                 doc.fontSize(13).font('Helvetica-Bold');
-                setColor(doc, PRIMARY);
+                setColor(doc, primaryColor);
             } else {
                 doc.fontSize(11).font('Helvetica');
                 setColor(doc, TEXT_MAIN);
             }
             doc.text(label, col1 + 12, sumY);
-            if (isTotal) setColor(doc, PRIMARY);
+            if (isTotal) setColor(doc, primaryColor);
             doc.text(value, col1 + 12, sumY, { width: boxW - 24, align: 'right' });
             sumY += 28;
         });

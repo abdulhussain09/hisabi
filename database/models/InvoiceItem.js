@@ -30,24 +30,24 @@ const InvoiceItem = sequelize.define('InvoiceItem', {
         allowNull: false
     },
     unit_price: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false
     },
     cost_price: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false,
         defaultValue: 0
     },
     mrp: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: true
     },
     line_total: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false
     },
     tax_amount: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false,
         defaultValue: 0
     }

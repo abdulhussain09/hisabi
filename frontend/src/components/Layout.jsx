@@ -113,7 +113,7 @@ const Sidebar = ({ location, onClose, isLocked, onUpgradeTrigger }) => {
                     }}
                 >
                     {user?.shop?.brand_logo ? (
-                        <img src={`${IMAGE_BASE_URL}${user.shop.brand_logo}`} alt="Logo" className="w-full h-full object-contain p-1" />
+                        <img src={getImageUrl(user.shop.brand_logo)} alt="Logo" className="w-full h-full object-contain p-1" />
                     ) : (
                         <Store className="w-4 h-4 text-white" />
                     )}

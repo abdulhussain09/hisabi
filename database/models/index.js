@@ -159,6 +159,34 @@ const syncDatabase = async () => {
         try {
             await sequelize.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_address TEXT;');
             await sequelize.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_id UUID;');
+            await sequelize.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qr_code_data TEXT;');
+            
+            // Ensure enum_products_tax_category exists
+            await sequelize.query(`
+                DO $$ BEGIN
+                    CREATE TYPE "public"."enum_products_tax_category" AS ENUM ('standard', 'zero_rated', 'exempt');
+                EXCEPTION WHEN duplicate_object THEN NULL;
+                END $$;
+            `);
+
+            // Safe column widening to DECIMAL(12,3) for KWD 3-decimal precision
+            await sequelize.query(`
+                ALTER TABLE "products" ALTER COLUMN "cost_price" TYPE DECIMAL(12,3);
+                ALTER TABLE "products" ALTER COLUMN "selling_price" TYPE DECIMAL(12,3);
+                ALTER TABLE "products" ALTER COLUMN "mrp" TYPE DECIMAL(12,3);
+
+                ALTER TABLE "invoices" ALTER COLUMN "subtotal" TYPE DECIMAL(12,3);
+                ALTER TABLE "invoices" ALTER COLUMN "tax_total" TYPE DECIMAL(12,3);
+                ALTER TABLE "invoices" ALTER COLUMN "grand_total" TYPE DECIMAL(12,3);
+                ALTER TABLE "invoices" ALTER COLUMN "discount" TYPE DECIMAL(12,3);
+                ALTER TABLE "invoices" ALTER COLUMN "paid_amount" TYPE DECIMAL(12,3);
+                ALTER TABLE "invoices" ALTER COLUMN "due_amount" TYPE DECIMAL(12,3);
+
+                ALTER TABLE "invoice_items" ALTER COLUMN "unit_price" TYPE DECIMAL(12,3);
+                ALTER TABLE "invoice_items" ALTER COLUMN "cost_price" TYPE DECIMAL(12,3);
+                ALTER TABLE "invoice_items" ALTER COLUMN "line_total" TYPE DECIMAL(12,3);
+                ALTER TABLE "invoice_items" ALTER COLUMN "tax_amount" TYPE DECIMAL(12,3);
+            `);
         } catch { /* silent fallback */ }
 
         // Fix: drop duplicate unique index on users.username before Sequelize recreates it

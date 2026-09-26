@@ -2,6 +2,9 @@ const Joi = require('joi');
 const { sequelize } = require('../../../database/database');
 const { Shop, Product, Invoice, InvoiceItem, BundleItem, Customer } = require('../../../database/models');
 
+const { calculateLineTax } = require('../utils/taxUtils');
+const { generateGCC_TLV_Base64 } = require('../utils/tlvUtils');
+
 const invoiceSchema = Joi.object({
     customer_name: Joi.string().allow('', null),
     customer_phone: Joi.string().allow('', null),
@@ -111,14 +114,10 @@ const createInvoice = async (req, res) => {
 
             const unit_price = parseFloat(product.selling_price);
             const line_total = unit_price * item.quantity;
-            let line_tax = 0;
-
-            if (shop.vat_enabled) {
-                line_tax = line_total * 0.05;
-            }
+            const { taxAmount } = calculateLineTax(line_total, product.tax_category, shop);
 
             subtotal += line_total;
-            tax_total += line_tax;
+            tax_total += taxAmount;
 
             invoiceItemsData.push({
                 product_id: product.id,
@@ -127,7 +126,7 @@ const createInvoice = async (req, res) => {
                 cost_price: product.cost_price, // Store cost price at time of sale
                 mrp: product.mrp, // Store MRP
                 line_total: line_total,
-                tax_amount: line_tax
+                tax_amount: taxAmount
             });
         }
 
@@ -195,6 +194,15 @@ const createInvoice = async (req, res) => {
         });
         const nextInvoiceNumber = lastInvoice ? lastInvoice.invoice_number + 1 : 1;
 
+        // Generate GCC TLV QR Base64
+        const qr_code_data = generateGCC_TLV_Base64({
+            sellerName: shop.name,
+            vatNumber: shop.trn,
+            timestamp: new Date(),
+            invoiceTotal: grand_total,
+            vatTotal: tax_total
+        });
+
         // Create Invoice
         const invoice = await Invoice.create({
             shop_id,
@@ -211,7 +219,8 @@ const createInvoice = async (req, res) => {
             customer_phone: customer_phone ? customer_phone.trim() : null,
             customer_email: customer_email ? customer_email.trim() : null,
             customer_address: customer_address ? customer_address.trim() : (customerRecord ? customerRecord.address : null),
-            customer_id: customerRecord ? customerRecord.id : null
+            customer_id: customerRecord ? customerRecord.id : null,
+            qr_code_data: qr_code_data
         }, { transaction: t });
 
         // Create Invoice Items linked to Invoice
@@ -452,6 +461,45 @@ const updatePayment = async (req, res) => {
     }
 };
 
+const syncOfflineInvoices = async (req, res) => {
+    try {
+        const { offlineInvoices } = req.body;
+        if (!Array.isArray(offlineInvoices) || offlineInvoices.length === 0) {
+            return res.json({ synced: [], failed: [] });
+        }
+
+        const synced = [];
+        const failed = [];
+
+        for (const item of offlineInvoices) {
+            try {
+                const reqMock = {
+                    user: req.user,
+                    body: item.data
+                };
+                let resultData = null;
+                const resMock = {
+                    status: () => resMock,
+                    json: (data) => { resultData = data; }
+                };
+                await createInvoice(reqMock, resMock);
+                if (resultData && !resultData.error) {
+                    synced.push({ client_id: item.client_id, invoice: resultData });
+                } else {
+                    failed.push({ client_id: item.client_id, error: resultData?.error || 'Sync failed' });
+                }
+            } catch (err) {
+                failed.push({ client_id: item.client_id, error: err.message });
+            }
+        }
+
+        res.json({ synced, failed });
+    } catch (error) {
+        console.error('Sync Offline Invoices Error:', error);
+        res.status(500).json({ error: 'Failed to sync offline invoices' });
+    }
+};
+
 module.exports = {
     createInvoice,
     listInvoices,
@@ -459,5 +507,6 @@ module.exports = {
     downloadInvoicePDF,
     deleteInvoice,
     updatePayment,
+    syncOfflineInvoices,
     invoiceSchema
 };

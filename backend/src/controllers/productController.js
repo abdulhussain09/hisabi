@@ -90,7 +90,7 @@ const createProduct = async (req, res) => {
         const shop_id = req.user.shop_id;
         
         // Parse bundle_items if sent as string (multipart/form-data limitation)
-        let { name, barcode, cost_price, selling_price, stock_quantity, mrp, is_bundle, bundle_items, category_id } = req.body;
+        let { name, barcode, cost_price, selling_price, stock_quantity, mrp, is_bundle, bundle_items, category_id, tax_category } = req.body;
         const image_path = req.file ? uploadMiddleware.processImageToDataUri(req.file, 'product') : null;
 
         if (typeof bundle_items === 'string') {
@@ -138,7 +138,8 @@ const createProduct = async (req, res) => {
             mrp,
             is_bundle,
             image_path,
-            category_id: category_id || null
+            category_id: category_id || null,
+            tax_category: ['standard', 'zero_rated', 'exempt'].includes(tax_category) ? tax_category : 'standard'
         }, { transaction: t });
 
         if (is_bundle && bundle_items && bundle_items.length > 0) {
@@ -169,7 +170,7 @@ const updateProduct = async (req, res) => {
         const shop_id = req.user.shop_id;
         const { id } = req.params;
         
-        let { name, barcode, cost_price, selling_price, stock_quantity, mrp, is_bundle, bundle_items, category_id, remove_image } = req.body;
+        let { name, barcode, cost_price, selling_price, stock_quantity, mrp, is_bundle, bundle_items, category_id, tax_category, remove_image } = req.body;
         let image_path = req.file ? uploadMiddleware.processImageToDataUri(req.file, 'product') : undefined;
         if (!req.file && (remove_image === 'true' || remove_image === true)) {
             image_path = null;
@@ -215,7 +216,8 @@ const updateProduct = async (req, res) => {
             mrp,
             ...(is_bundle !== undefined && { is_bundle }),
             ...(image_path !== undefined && { image_path }),
-            ...(category_id !== undefined && { category_id: category_id || null })
+            ...(category_id !== undefined && { category_id: category_id || null }),
+            ...(['standard', 'zero_rated', 'exempt'].includes(tax_category) && { tax_category })
         }, { transaction: t });
 
         if ((is_bundle || product.is_bundle) && bundle_items) {

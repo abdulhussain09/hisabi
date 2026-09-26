@@ -25,12 +25,12 @@ const Product = sequelize.define('Product', {
         allowNull: true
     },
     cost_price: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false,
         defaultValue: 0
     },
     selling_price: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: false,
         defaultValue: 0
     },
@@ -52,8 +52,13 @@ const Product = sequelize.define('Product', {
         }
     },
     mrp: {
-        type: DataTypes.DECIMAL(10, 2),
+        type: DataTypes.DECIMAL(12, 3),
         allowNull: true
+    },
+    tax_category: {
+        type: DataTypes.ENUM('standard', 'zero_rated', 'exempt'),
+        allowNull: false,
+        defaultValue: 'standard'
     }
 }, {
     tableName: 'products',

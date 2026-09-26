@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api, { IMAGE_BASE_URL, getImageUrl } from '../api/axios';
+import { formatCurrency } from '../utils/currencyUtils';
 import { Plus, Edit, Trash2, Search, X, Package, Upload, FolderPlus, ArrowLeft, Tag, Pencil, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -69,6 +70,7 @@ const ProductModal = ({ editingProduct, categoryId, onClose, onSuccess, currency
         selling_price: 0,
         mrp: 0,
         stock_quantity: 0,
+        tax_category: 'standard',
     });
     const [selectedFile, setSelectedFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
@@ -82,6 +84,7 @@ const ProductModal = ({ editingProduct, categoryId, onClose, onSuccess, currency
                 selling_price: editingProduct.selling_price,
                 mrp: editingProduct.mrp || 0,
                 stock_quantity: editingProduct.stock_quantity,
+                tax_category: editingProduct.tax_category || 'standard',
             });
             setPreviewUrl(editingProduct.image_path ? getImageUrl(editingProduct.image_path) : null);
         }
@@ -102,6 +105,7 @@ const ProductModal = ({ editingProduct, categoryId, onClose, onSuccess, currency
             data.append('selling_price', formData.selling_price);
             data.append('mrp', formData.mrp || 0);
             data.append('stock_quantity', formData.stock_quantity);
+            data.append('tax_category', formData.tax_category || 'standard');
             if (categoryId) data.append('category_id', categoryId);
             if (selectedFile) data.append('image', selectedFile);
 
@@ -157,16 +161,28 @@ const ProductModal = ({ editingProduct, categoryId, onClose, onSuccess, currency
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="form-label">{t('products.cost')}</label>
-                                <input className="input-field" type="number" step="0.01" required value={formData.cost_price} onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })} />
+                                <input className="input-field" type="number" step="0.001" required value={formData.cost_price} onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) })} />
                             </div>
                             <div>
                                 <label className="form-label">{t('products.selling')}</label>
-                                <input className="input-field" type="number" step="0.01" required value={formData.selling_price} onChange={(e) => setFormData({ ...formData, selling_price: parseFloat(e.target.value) })} />
+                                <input className="input-field" type="number" step="0.001" required value={formData.selling_price} onChange={(e) => setFormData({ ...formData, selling_price: parseFloat(e.target.value) })} />
                             </div>
                         </div>
                         <div>
                             <label className="form-label">{t('products.mrp')}</label>
-                            <input className="input-field" type="number" step="0.01" value={formData.mrp} onChange={(e) => setFormData({ ...formData, mrp: parseFloat(e.target.value) })} placeholder="Maximum Retail Price" />
+                            <input className="input-field" type="number" step="0.001" value={formData.mrp} onChange={(e) => setFormData({ ...formData, mrp: parseFloat(e.target.value) })} placeholder="Maximum Retail Price" />
+                        </div>
+                        <div>
+                            <label className="form-label">Tax Category</label>
+                            <select
+                                className="input-field"
+                                value={formData.tax_category || 'standard'}
+                                onChange={(e) => setFormData({ ...formData, tax_category: e.target.value })}
+                            >
+                                <option value="standard">Standard Tax (5% UAE / 18% IN)</option>
+                                <option value="zero_rated">Zero-Rated (0%)</option>
+                                <option value="exempt">Exempt (0%)</option>
+                            </select>
                         </div>
                     </div>
                     <div className="modal-footer">
@@ -226,13 +242,13 @@ const ProductTable = ({ products, isAdmin, currency, onEdit, onDelete }) => {
                                     </div>
                                 </td>
                                 <td><span className="font-mono text-xs text-gray-400">{product.barcode || '—'}</span></td>
-                                <td className="text-right font-bold text-gray-900">{currency} {product.selling_price}</td>
+                                <td className="text-right font-bold text-gray-900">{formatCurrency(product.selling_price, currency, true)}</td>
                                 <td className="text-right">
                                     {product.mrp ? (
-                                        <span className="text-xs text-gray-400 line-through decoration-red-400">{currency} {product.mrp}</span>
+                                        <span className="text-xs text-gray-400 line-through decoration-red-400">{formatCurrency(product.mrp, currency, true)}</span>
                                     ) : <span className="text-gray-300">—</span>}
                                 </td>
-                                {isAdmin && <td className="text-right text-gray-500">{currency} {product.cost_price}</td>}
+                                {isAdmin && <td className="text-right text-gray-500">{formatCurrency(product.cost_price, currency, true)}</td>}
                                 <td>
                                     <div className="flex justify-center">
                                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-full ${product.stock_quantity > 6 ? 'bg-emerald-50 text-emerald-700' :
