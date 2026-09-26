@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import api, { IMAGE_BASE_URL } from '../api/axios';
+import api, { IMAGE_BASE_URL, getImageUrl } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import {
@@ -12,11 +12,7 @@ import {
 import PricingModal from './PricingModal';
 import { usePlan } from '../hooks/usePlan';
 
-const getImageUrl = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    return `${IMAGE_BASE_URL}${url}`;
-};
+
 
 const NAV = [
     {
