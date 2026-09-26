@@ -12,6 +12,11 @@ import {
 import PricingModal from './PricingModal';
 import { usePlan } from '../hooks/usePlan';
 
+const getImageUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    return `${IMAGE_BASE_URL}${url}`;
+};
 
 const NAV = [
     {
@@ -113,7 +118,7 @@ const Sidebar = ({ location, onClose, isLocked, onUpgradeTrigger }) => {
                     }}
                 >
                     {user?.shop?.brand_logo ? (
-                        <img src={getImageUrl(user.shop.brand_logo)} alt="Logo" className="w-full h-full object-contain p-1" />
+                        <img src={getImageUrl(user.shop.brand_logo)} alt={`${user?.shop?.name || 'Shop'} logo`} className="w-full h-full object-contain p-1" />
                     ) : (
                         <Store className="w-4 h-4 text-white" />
                     )}
