@@ -20,6 +20,7 @@ const SuperAdmin = require('./SuperAdmin');
 const Advertisement = require('./Advertisement');
 const Announcement = require('./Announcement');
 const ActivityLog = require('./ActivityLog');
+const InvoiceRevision = require('./InvoiceRevision');
 
 // ─── ALL ASSOCIATIONS (single source of truth) ────────────────────────
 // ... (lines omitted for brevity, but I will target specific insertion points)
@@ -114,10 +115,11 @@ SalesTarget.belongsTo(Shop, { foreignKey: 'shop_id', onDelete: 'CASCADE' });
 Shop.hasMany(DuePayment, { foreignKey: 'shop_id' });
 DuePayment.belongsTo(Shop, { foreignKey: 'shop_id', onDelete: 'CASCADE' });
 Invoice.hasMany(DuePayment, { foreignKey: 'invoice_id', as: 'payments', onDelete: 'CASCADE' });
-DuePayment.belongsTo(Invoice, { foreignKey: 'invoice_id' });
-
-// Platform Discount Codes (no shop_id)
-// We'll reuse DiscountCode model but make shop_id optional
+// InvoiceRevision associations
+Invoice.hasMany(InvoiceRevision, { foreignKey: 'invoice_id', as: 'revisions', onDelete: 'CASCADE' });
+InvoiceRevision.belongsTo(Invoice, { foreignKey: 'invoice_id' });
+User.hasMany(InvoiceRevision, { foreignKey: 'changed_by' });
+InvoiceRevision.belongsTo(User, { foreignKey: 'changed_by', as: 'changedBy' });
 
 // ─── Database Sync ────────────────────────────────────────────────────
 const syncDatabase = async () => {
@@ -161,6 +163,9 @@ const syncDatabase = async () => {
             await sequelize.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_id UUID;');
             await sequelize.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS qr_code_data TEXT;');
             
+            // Allow NULL product_id on invoice_items for custom non-inventory items
+            await sequelize.query('ALTER TABLE invoice_items ALTER COLUMN product_id DROP NOT NULL;');
+
             // Ensure enum_products_tax_category exists
             await sequelize.query(`
                 DO $$ BEGIN
@@ -187,7 +192,36 @@ const syncDatabase = async () => {
                 ALTER TABLE "invoice_items" ALTER COLUMN "line_total" TYPE DECIMAL(12,3);
                 ALTER TABLE "invoice_items" ALTER COLUMN "tax_amount" TYPE DECIMAL(12,3);
             `);
-        } catch { /* silent fallback */ }
+
+            // Migration backfill for existing invoices from parent shop config
+            await sequelize.query(`
+                UPDATE "invoices" i
+                SET 
+                  "country" = COALESCE(s."country", 'AE'),
+                  "currency" = COALESCE(s."currency", 'AED'),
+                  "tax_mode" = CASE 
+                                 WHEN s."country" = 'IN' THEN 'GST'
+                                 WHEN s."country" = 'KW' THEN 'NONE'
+                                 ELSE 'VAT'
+                               END
+                FROM "shops" s
+                WHERE i."shop_id" = s."id" AND i."country" IS NULL;
+            `);
+
+            // Migration backfill for existing invoice items from product master
+            await sequelize.query(`
+                UPDATE "invoice_items" ii
+                SET 
+                  "item_name" = p."name",
+                  "item_description" = p."description",
+                  "sku" = p."barcode",
+                  "mrp" = COALESCE(ii."mrp", p."mrp")
+                FROM "products" p
+                WHERE ii."product_id" = p."id" AND ii."item_name" IS NULL;
+            `);
+        } catch (e) {
+            console.warn('Pre-sync migration notice:', e.message);
+        }
 
         // Fix: drop duplicate unique index on users.username before Sequelize recreates it
         try {
@@ -204,7 +238,7 @@ const syncDatabase = async () => {
 module.exports = {
     sequelize, syncDatabase,
     Shop, User, Category, Product,
-    Invoice, InvoiceItem, BundleItem,
+    Invoice, InvoiceItem, InvoiceRevision, BundleItem,
     Customer, Supplier, Expense,
     PurchaseOrder, PurchaseOrderItem,
     Return, StockAdjustment, DiscountCode, SalesTarget, DuePayment,

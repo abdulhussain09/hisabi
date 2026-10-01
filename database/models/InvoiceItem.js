@@ -19,7 +19,7 @@ const InvoiceItem = sequelize.define('InvoiceItem', {
     },
     product_id: {
         type: DataTypes.UUID,
-        allowNull: false,
+        allowNull: true, // Nullable for custom non-inventory items
         references: {
             model: Product,
             key: 'id'
@@ -50,6 +50,62 @@ const InvoiceItem = sequelize.define('InvoiceItem', {
         type: DataTypes.DECIMAL(12, 3),
         allowNull: false,
         defaultValue: 0
+    },
+    item_name: {
+        type: DataTypes.STRING(200),
+        allowNull: true
+    },
+    item_description: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    sku: {
+        type: DataTypes.STRING(50),
+        allowNull: true
+    },
+    hsn_sac: {
+        type: DataTypes.STRING(20),
+        allowNull: true
+    },
+    unit: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'PCS'
+    },
+    discount: {
+        type: DataTypes.DECIMAL(12, 3),
+        allowNull: false,
+        defaultValue: 0
+    },
+    taxable_amount: {
+        type: DataTypes.DECIMAL(12, 3),
+        allowNull: false,
+        defaultValue: 0
+    },
+    tax_rate: {
+        type: DataTypes.DECIMAL(5, 4),
+        allowNull: false,
+        defaultValue: 0
+    },
+    cgst_amount: {
+        type: DataTypes.DECIMAL(12, 3),
+        allowNull: false,
+        defaultValue: 0
+    },
+    sgst_amount: {
+        type: DataTypes.DECIMAL(12, 3),
+        allowNull: false,
+        defaultValue: 0
+    },
+    igst_amount: {
+        type: DataTypes.DECIMAL(12, 3),
+        allowNull: false,
+        defaultValue: 0
+    },
+    is_custom_item: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
     }
 }, {
     tableName: 'invoice_items',

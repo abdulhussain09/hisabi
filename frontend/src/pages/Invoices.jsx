@@ -5,11 +5,13 @@ import {
     Printer, Download, Search, FileText, User,
     ChevronLeft, ChevronRight, CheckCircle2, Trash2,
     Circle, AlertCircle, ChevronDown, ChevronUp, Tag,
-    Clock, Crown
+    Clock, Crown, Edit3, Eye, X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import PricingModal from '../components/PricingModal';
+import InvoiceRenderer from '../components/invoice/InvoiceRenderer';
+import InvoiceEditor from '../components/invoice/InvoiceEditor';
 
 const StatusBadge = ({ status }) => {
     const { t } = useTranslation();
@@ -20,7 +22,7 @@ const StatusBadge = ({ status }) => {
     return <span className="bg-slate-50 text-slate-500 px-2.5 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1.5 border border-slate-100"><Circle className="w-3 h-3" />{t('invoices.status.void')}</span>;
 };
 
-const InvoiceRow = ({ inv, user, onDelete, onDownload, currency }) => {
+const InvoiceRow = ({ inv, user, onDelete, onDownload, onEdit, onView, currency }) => {
     const { t } = useTranslation();
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -45,7 +47,9 @@ const InvoiceRow = ({ inv, user, onDelete, onDownload, currency }) => {
                         </div>
                         <div>
                             <p className="text-sm font-black text-slate-900 leading-none">{t('invoices.number')}{String(inv.invoice_number).padStart(5, '0')}</p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{t('invoices.type_sale')}</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                {inv.lifecycle_status ? inv.lifecycle_status.toUpperCase() : t('invoices.type_sale')}
+                            </p>
                         </div>
                     </div>
                 </td>
@@ -83,6 +87,20 @@ const InvoiceRow = ({ inv, user, onDelete, onDownload, currency }) => {
                 <td className="pr-4">
                     <div className="flex items-center justify-end gap-1.5">
                         <button
+                            onClick={() => onView(inv)}
+                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-900 hover:border-slate-400 hover:shadow-sm transition-all shadow-sm"
+                            title="View A4 Invoice"
+                        >
+                            <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => onEdit(inv)}
+                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-sm transition-all shadow-sm"
+                            title="Edit Invoice"
+                        >
+                            <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
                             onClick={() => onDownload(inv.id, inv.invoice_number)}
                             className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-sm transition-all shadow-sm"
                             title="Download PDF"
@@ -105,7 +123,6 @@ const InvoiceRow = ({ inv, user, onDelete, onDownload, currency }) => {
                 <tr className="bg-slate-50/50 border-b border-slate-100">
                     <td colSpan={7} className="p-0">
                         <div className="px-14 py-6 animate-in slide-in-from-top-2 duration-300 space-y-4">
-                            {/* Professional Details Expansion */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
                                 <div className="space-y-2">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('pos.customer_details')}</p>
@@ -124,14 +141,12 @@ const InvoiceRow = ({ inv, user, onDelete, onDownload, currency }) => {
                                 </div>
                             </div>
 
-                            {/* Payment Highlight */}
                             <div className="text-center py-2 px-4 bg-slate-50 border border-slate-100 rounded-xl">
                                 <p className="text-xs font-black text-slate-900 uppercase tracking-widest">
                                     {formatCurrency(inv.paid_amount, currency, true)} paid on {fmt(inv.date)}, {fmtTime(inv.date)}
                                 </p>
                             </div>
 
-                            {/* Items Table */}
                             <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-sm">
                                 <table className="w-full">
                                     <thead className="bg-slate-50/80 border-b border-slate-100">
@@ -153,7 +168,10 @@ const InvoiceRow = ({ inv, user, onDelete, onDownload, currency }) => {
                                                         <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center">
                                                             <Tag className="w-3.5 h-3.5 text-slate-400" />
                                                         </div>
-                                                        <span className="text-xs font-bold text-slate-900">{item.Product?.name || 'Deleted Product'}</span>
+                                                        <div>
+                                                            <p className="text-xs font-bold text-slate-900">{item.item_name || item.Product?.name || 'Item'}</p>
+                                                            {item.item_description && <p className="text-[10px] text-slate-400">{item.item_description}</p>}
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-center text-xs font-black text-slate-700 tabular-nums">{item.quantity}</td>
@@ -164,7 +182,7 @@ const InvoiceRow = ({ inv, user, onDelete, onDownload, currency }) => {
                                                     </td>
                                                 )}
                                                 <td className="px-6 py-4 text-right text-xs font-black text-slate-900 tabular-nums">
-                                                    {formatCurrency(item.quantity * item.unit_price, currency, true)}
+                                                    {formatCurrency(item.line_total || (item.quantity * item.unit_price), currency, true)}
                                                 </td>
                                             </tr>
                                         ))}
@@ -176,7 +194,7 @@ const InvoiceRow = ({ inv, user, onDelete, onDownload, currency }) => {
                                         </tr>
                                         {parseFloat(inv.tax_total) > 0 && (
                                             <tr>
-                                                <td colSpan={user?.shop?.country === 'IN' ? 4 : 3} className="px-6 py-4 text-right text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">{user?.shop?.country === 'IN' ? 'GST' : (user?.shop?.country === 'AE' ? 'VAT (5%)' : 'Tax')}</td>
+                                                <td colSpan={user?.shop?.country === 'IN' ? 4 : 3} className="px-6 py-4 text-right text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">{user?.shop?.country === 'IN' ? 'GST' : 'VAT (5%)'}</td>
                                                 <td className="px-6 py-4 text-right text-sm font-black text-blue-600 tabular-nums">+{formatCurrency(inv.tax_total, currency, true)}</td>
                                             </tr>
                                         )}
@@ -199,7 +217,7 @@ const InvoiceRow = ({ inv, user, onDelete, onDownload, currency }) => {
             )}
         </>
     );
-}
+};
 
 const Invoices = () => {
     const { user } = useAuth();
@@ -211,6 +229,10 @@ const Invoices = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [searchTerm, setSearchTerm] = useState('');
     const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+
+    // Editing & View State
+    const [editingInvoice, setEditingInvoice] = useState(null);
+    const [viewingInvoice, setViewingInvoice] = useState(null);
 
     const currentPlan = user?.shop?.plan || 'free';
     const isPremium = currentPlan === 'premium';
@@ -255,6 +277,30 @@ const Invoices = () => {
         } catch { alert(t('invoices.errors.download_failed')); }
     };
 
+    const handleSaveInvoiceEdit = async (updatedData) => {
+        try {
+            await api.put(`/invoices/${editingInvoice.id}`, {
+                expected_version: editingInvoice.version_number,
+                ...updatedData
+            });
+            setEditingInvoice(null);
+            fetchInvoices();
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to save invoice edits');
+        }
+    };
+
+    if (editingInvoice) {
+        return (
+            <InvoiceEditor
+                initialInvoice={editingInvoice}
+                shop={user?.shop || {}}
+                onSave={handleSaveInvoiceEdit}
+                onCancel={() => setEditingInvoice(null)}
+            />
+        );
+    }
+
     const filtered = invoices.filter(inv =>
         !searchTerm || String(inv.invoice_number).includes(searchTerm) || (inv.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -288,6 +334,34 @@ const Invoices = () => {
                     />
                 </div>
             </div>
+
+            {/* View A4 Modal */}
+            {viewingInvoice && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+                    <div className="bg-slate-100 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl">
+                        <div className="flex justify-between items-center mb-4 no-print">
+                            <h3 className="text-base font-black text-slate-900">
+                                Invoice #{String(viewingInvoice.invoice_number).padStart(5, '0')} Document
+                            </h3>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => window.print()}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-blue-700"
+                                >
+                                    <Printer className="w-4 h-4" /> Print Document
+                                </button>
+                                <button
+                                    onClick={() => setViewingInvoice(null)}
+                                    className="p-2 text-slate-400 hover:text-slate-700 rounded-xl bg-white border border-slate-200"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                        <InvoiceRenderer invoice={viewingInvoice} shop={user?.shop || {}} />
+                    </div>
+                </div>
+            )}
 
             {/* ── History Retention Warning (Non-Premium) ── */}
             {!isPremium && (
@@ -360,6 +434,8 @@ const Invoices = () => {
                                         user={user}
                                         onDelete={handleDelete}
                                         onDownload={handleDownload}
+                                        onEdit={setEditingInvoice}
+                                        onView={setViewingInvoice}
                                         currency={currency}
                                     />
                                 ))

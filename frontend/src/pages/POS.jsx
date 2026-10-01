@@ -278,6 +278,7 @@ const POS = () => {
         setLoading(true);
 
         const payload = {
+            idempotency_key: `ik_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
             items: cart.map(item => ({
                 product_id: item.product_id,
                 quantity: item.quantity

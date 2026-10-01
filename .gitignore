@@ -37,4 +37,7 @@ Thumbs.db
 
 # Confidential documentation
 FEATURES_AND_ARCHITECTURE.md
-docs/
+docs/HISABI_COMPLETE_DEVELOPER_GUIDE.md
+
+# Temporary scratch scripts
+scratch/

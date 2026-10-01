@@ -4,6 +4,7 @@ const validate = require('../middleware/validate');
 const { authenticate, authorize } = require('../middleware/auth');
 const {
     createInvoice,
+    updateInvoice,
     listInvoices,
     getInvoice,
     downloadInvoicePDF,
@@ -18,6 +19,7 @@ router.use(authenticate);
 
 // Staff and Admin can create, sync and view invoices
 router.post('/', validate(invoiceSchema), createInvoice);
+router.put('/:id', validate(invoiceSchema), updateInvoice);
 router.post('/sync-offline', syncOfflineInvoices);
 router.get('/', listInvoices);
 router.get('/:id', getInvoice);

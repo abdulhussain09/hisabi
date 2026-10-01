@@ -89,6 +89,99 @@ const Invoice = sequelize.define('Invoice', {
     qr_code_data: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    country: {
+        type: DataTypes.STRING(2),
+        allowNull: true // Backfilled dynamically from shop during sync
+    },
+    currency: {
+        type: DataTypes.STRING(10),
+        allowNull: true // Backfilled dynamically from shop during sync
+    },
+    tax_mode: {
+        type: DataTypes.STRING(10),
+        allowNull: true // 'GST' | 'VAT' | 'NONE'
+    },
+    invoice_type: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'tax_invoice' // 'tax_invoice' | 'simplified'
+    },
+    lifecycle_status: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'finalized' // 'draft' | 'generated' | 'finalized' | 'revised' | 'voided'
+    },
+    version_number: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1
+    },
+    idempotency_key: {
+        type: DataTypes.STRING(100),
+        allowNull: true
+    },
+    seller_name_snapshot: {
+        type: DataTypes.STRING(100),
+        allowNull: true
+    },
+    seller_address_snapshot: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    seller_phone_snapshot: {
+        type: DataTypes.STRING(30),
+        allowNull: true
+    },
+    seller_email_snapshot: {
+        type: DataTypes.STRING(100),
+        allowNull: true
+    },
+    seller_tax_id_snapshot: {
+        type: DataTypes.STRING(50),
+        allowNull: true
+    },
+    seller_cr_number_snapshot: {
+        type: DataTypes.STRING(50),
+        allowNull: true
+    },
+    buyer_tax_id: {
+        type: DataTypes.STRING(50),
+        allowNull: true
+    },
+    supply_date: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    place_of_supply_state: {
+        type: DataTypes.STRING(100),
+        allowNull: true
+    },
+    place_of_supply_code: {
+        type: DataTypes.STRING(10),
+        allowNull: true
+    },
+    reverse_charge: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+    },
+    payment_method: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        defaultValue: 'cash'
+    },
+    notes: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    declaration: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    bank_details_snapshot: {
+        type: DataTypes.JSONB,
+        allowNull: true
     }
 }, {
     tableName: 'invoices',

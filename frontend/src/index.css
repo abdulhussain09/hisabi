@@ -261,3 +261,25 @@
   ::-webkit-scrollbar-thumb { @apply bg-gray-200 rounded-full; }
   ::-webkit-scrollbar-thumb:hover { @apply bg-gray-300; }
 }
+
+/* ─── Print Styles ─── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt;
+  }
+  .no-print, nav, header, sidebar, .page-header, button, .modal-overlay {
+    display: none !important;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr, .card {
+    break-inside: avoid;
+  }
+}
