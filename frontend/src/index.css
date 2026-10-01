@@ -266,20 +266,25 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 0;
+  }
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   body {
     background: #ffffff !important;
-    color: #000000 !important;
-    font-size: 12pt;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  .no-print, nav, header, sidebar, .page-header, button, .modal-overlay {
+  .no-print, nav, header, sidebar, .page-header, button, .modal-backdrop {
     display: none !important;
   }
   thead {
     display: table-header-group;
   }
-  tr, .card {
+  tr, .card, table {
     break-inside: avoid;
   }
 }

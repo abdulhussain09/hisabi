@@ -202,7 +202,7 @@ const createInvoice = async (req, res) => {
             paidAmount: paid_amount || 0,
             sellerState: shop.address || '',
             buyerState: place_of_supply_state || customer_address || '',
-            reverseCharge
+            reverseCharge: Boolean(reverse_charge)
         });
 
         const { items: calcItems, totals, meta } = calculation;
@@ -474,7 +474,7 @@ const updateInvoice = async (req, res) => {
             paidAmount: paid_amount || 0,
             sellerState: shop.address || '',
             buyerState: place_of_supply_state || customer_address || '',
-            reverseCharge
+            reverseCharge: Boolean(reverse_charge)
         });
 
         const { items: calcItems, totals, meta } = calculation;

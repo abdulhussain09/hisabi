@@ -125,7 +125,8 @@ export function calculateInvoice({
     const taxableTotal = Math.max(0, round(taxableSubtotal - gDiscount, decimals));
     const rawGrandTotal = round(taxableTotal + taxTotal, decimals);
     
-    const roundedGrandTotal = Math.round(rawGrandTotal);
+    // Round Off calculation: India GST uses standard integer round-off; KW and AE maintain exact decimal amounts
+    const roundedGrandTotal = country === 'IN' ? Math.round(rawGrandTotal) : rawGrandTotal;
     const roundOff = round(roundedGrandTotal - rawGrandTotal, decimals);
 
     const grandTotal = roundedGrandTotal;
