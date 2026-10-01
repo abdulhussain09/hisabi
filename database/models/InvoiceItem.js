@@ -83,7 +83,7 @@ const InvoiceItem = sequelize.define('InvoiceItem', {
         defaultValue: 0
     },
     tax_rate: {
-        type: DataTypes.DECIMAL(5, 4),
+        type: DataTypes.DECIMAL(6, 4),
         allowNull: false,
         defaultValue: 0
     },

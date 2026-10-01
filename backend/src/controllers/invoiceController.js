@@ -249,14 +249,17 @@ const createInvoice = async (req, res) => {
         });
         const nextInvoiceNumber = lastInvoice ? lastInvoice.invoice_number + 1 : 1;
 
-        // GCC TLV Base64 QR Generation
-        const qr_code_data = generateGCC_TLV_Base64({
-            sellerName: shop.name,
-            vatNumber: shop.trn,
-            timestamp: new Date(),
-            invoiceTotal: totals.grand_total,
-            vatTotal: totals.tax_total
-        });
+        // GCC TLV Base64 QR Generation (specifically required for UAE / GCC compliance)
+        let qr_code_data = null;
+        if (meta.country === 'AE') {
+            qr_code_data = generateGCC_TLV_Base64({
+                sellerName: shop.name,
+                vatNumber: shop.trn,
+                timestamp: new Date(),
+                invoiceTotal: totals.grand_total,
+                vatTotal: totals.tax_total
+            });
+        }
 
         // Create Invoice
         const invoice = await Invoice.create({

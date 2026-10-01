@@ -305,6 +305,127 @@ const generateInvoicePDF = (invoice, shop) => {
     });
 };
 
-const generateDueReceiptPDF = require('./pdfService').generateDueReceiptPDF || null;
+// ─── Due Payment Receipt PDF ─────────────────────────────────────────────────
+
+const generateDueReceiptPDF = (payment, invoice, shop) => {
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ size: 'A4', margin: 60, bufferPages: true });
+        const chunks = [];
+
+        doc.on('data', chunk => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const pageWidth = doc.page.width - 120;
+        const currency = shop.currency || 'AED';
+        const date = formatDate(payment.payment_date);
+
+        const primaryColor = (shop && shop.brand_color) ? shop.brand_color : '#4f46e5';
+
+        // Header
+        doc.fontSize(22).font('Helvetica-Bold');
+        setColor(doc, primaryColor);
+        doc.text(shop.name || 'Shop', { align: 'center' });
+
+        if (shop.address) {
+            doc.fontSize(9).font('Helvetica');
+            setColor(doc, TEXT_MUTED);
+            doc.text(shop.address, { align: 'center' });
+        }
+
+        // Divider
+        setStroke(doc, primaryColor);
+        doc.moveTo(60, doc.y + 8).lineTo(60 + pageWidth, doc.y + 8).lineWidth(2).stroke();
+        doc.moveDown(1.5);
+
+        // Title
+        doc.fontSize(16).font('Helvetica-Bold');
+        setColor(doc, TEXT_MUTED);
+        doc.text('DUE PAYMENT RECEIPT', { align: 'center', characterSpacing: 2 });
+        doc.moveDown(1.5);
+
+        // Info grid (2x2)
+        const infoY = doc.y;
+        const col1 = 60, col2 = 60 + pageWidth / 2;
+        const drawInfoItem = (label, value, x, y) => {
+            doc.fontSize(8).font('Helvetica-Bold');
+            setColor(doc, TEXT_MUTED);
+            doc.text(label.toUpperCase(), x, y);
+            doc.fontSize(12).font('Helvetica-Bold');
+            setColor(doc, TEXT_MAIN);
+            doc.text(value, x, y + 12);
+        };
+
+        drawInfoItem('Receipt No', payment.due_invoice_number || '—', col1, infoY);
+        drawInfoItem('Date', date, col2, infoY);
+        drawInfoItem('Customer', invoice.customer_name || 'Walk-in Customer', col1, infoY + 45);
+        drawInfoItem('Original Invoice', `#${invoice.invoice_number}`, col2, infoY + 45);
+
+        doc.y = infoY + 90;
+        doc.moveDown(0.5);
+
+        // Payment summary box
+        const boxTop = doc.y;
+        const boxW = pageWidth;
+        const summaryRows = [
+            ['Original Grand Total:', `${currency} ${parseFloat(invoice.grand_total).toFixed(2)}`, false],
+            [`Total Paid Previously:`, `${currency} ${parseFloat(parseFloat(invoice.paid_amount) - parseFloat(payment.amount)).toFixed(2)}`, false],
+            ['Amount Collected Now:', `${currency} ${parseFloat(payment.amount).toFixed(2)}`, true],
+        ];
+        const summaryBoxH = summaryRows.length * 28 + 20;
+
+        doc.rect(col1, boxTop, boxW, summaryBoxH);
+        setColor(doc, BG_LIGHT);
+        doc.fill();
+
+        let sumY = boxTop + 12;
+        summaryRows.forEach(([label, value, isTotal]) => {
+            if (isTotal) {
+                setStroke(doc, BORDER);
+                doc.moveTo(col1 + 10, sumY - 4).lineTo(col1 + boxW - 10, sumY - 4).lineWidth(0.5).stroke();
+                doc.fontSize(13).font('Helvetica-Bold');
+                setColor(doc, primaryColor);
+            } else {
+                doc.fontSize(11).font('Helvetica');
+                setColor(doc, TEXT_MAIN);
+            }
+            doc.text(label, col1 + 12, sumY);
+            if (isTotal) setColor(doc, primaryColor);
+            doc.text(value, col1 + 12, sumY, { width: boxW - 24, align: 'right' });
+            sumY += 28;
+        });
+
+        // Remaining balance
+        if (parseFloat(payment.remaining_balance) > 0) {
+            doc.fontSize(11).font('Helvetica-Bold');
+            doc.fillColor([220, 38, 38]);
+            const remY = boxTop + summaryBoxH + 16;
+            doc.text('Remaining Balance:', col1, remY);
+            doc.text(`${currency} ${parseFloat(payment.remaining_balance).toFixed(2)}`, col1, remY, { width: boxW, align: 'right' });
+        }
+
+        // Payment method
+        doc.moveDown(3);
+        doc.fontSize(10).font('Helvetica-Bold');
+        setColor(doc, TEXT_MUTED);
+        doc.text('PAYMENT METHOD', { align: 'left' });
+        doc.fontSize(13).font('Helvetica-Bold');
+        setColor(doc, TEXT_MAIN);
+        doc.text((payment.payment_method || 'Cash').toUpperCase());
+
+        // Footer
+        const footerY = doc.page.height - 80;
+        setStroke(doc, BORDER);
+        doc.moveTo(60, footerY).lineTo(60 + pageWidth, footerY).lineWidth(0.5).stroke();
+
+        doc.fontSize(9).font('Helvetica');
+        setColor(doc, TEXT_MUTED);
+        doc.text('This is a computer generated receipt for your due payment.', 60, footerY + 12, { align: 'center', width: pageWidth });
+        doc.text('Thank you for your business!', 60, footerY + 26, { align: 'center', width: pageWidth });
+
+        doc.end();
+    });
+};
 
 module.exports = { generateInvoicePDF, generateDueReceiptPDF };
+

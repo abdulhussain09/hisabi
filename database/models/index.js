@@ -191,6 +191,7 @@ const syncDatabase = async () => {
                 ALTER TABLE "invoice_items" ALTER COLUMN "cost_price" TYPE DECIMAL(12,3);
                 ALTER TABLE "invoice_items" ALTER COLUMN "line_total" TYPE DECIMAL(12,3);
                 ALTER TABLE "invoice_items" ALTER COLUMN "tax_amount" TYPE DECIMAL(12,3);
+                ALTER TABLE "invoice_items" ALTER COLUMN "tax_rate" TYPE DECIMAL(6,4);
             `);
 
             // Migration backfill for existing invoices from parent shop config
@@ -213,7 +214,6 @@ const syncDatabase = async () => {
                 UPDATE "invoice_items" ii
                 SET 
                   "item_name" = p."name",
-                  "item_description" = p."description",
                   "sku" = p."barcode",
                   "mrp" = COALESCE(ii."mrp", p."mrp")
                 FROM "products" p

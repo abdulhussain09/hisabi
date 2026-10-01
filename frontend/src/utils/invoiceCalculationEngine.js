@@ -61,7 +61,9 @@ export function calculateInvoice({
         if (countryConfig.supportsTax && !reverseCharge) {
             if (shop.vat_enabled !== false && shop.gst_enabled !== false && taxCategory === 'standard') {
                 if (isGST) {
-                    taxRate = parseFloat(item.tax_rate || shop.gst_rate || 0.18);
+                    let rate = item.tax_rate !== undefined && item.tax_rate !== null ? parseFloat(item.tax_rate) : parseFloat(shop.gst_rate || 0.18);
+                    if (rate > 1) rate = rate / 100;
+                    taxRate = rate;
                     taxAmount = round(taxableAmount * taxRate, decimals);
 
                     if (isIntraState) {
@@ -78,7 +80,9 @@ export function calculateInvoice({
                         igstTotal += igstAmount;
                     }
                 } else if (isVAT) {
-                    taxRate = parseFloat(item.tax_rate || shop.vat_rate || 0.05);
+                    let rate = item.tax_rate !== undefined && item.tax_rate !== null ? parseFloat(item.tax_rate) : parseFloat(shop.vat_rate || 0.05);
+                    if (rate > 1) rate = rate / 100;
+                    taxRate = rate;
                     taxAmount = round(taxableAmount * taxRate, decimals);
                     vatTotal += taxAmount;
                 }
