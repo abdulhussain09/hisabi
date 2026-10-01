@@ -32,9 +32,15 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
     const placeCode = invoice.place_of_supply_code || '08';
     const paymentMethod = (invoice.payment_method || 'CASH').toUpperCase();
 
-    const bank = invoice.bank_details_snapshot || shop?.bank_details || {};
+    const bank = invoice.bank_details_snapshot || (shop?.bank_name ? {
+        bank_name: shop.bank_name,
+        account_number: shop.bank_account_number,
+        iban_ifsc: shop.bank_iban_ifsc
+    } : {});
     const qrData = invoice.qr_code_data || `upi://pay?pa=${shop?.upi_id || 'hisabi@upi'}&pn=${encodeURIComponent(sellerName)}&am=${totals.grand_total}&cu=INR`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrData)}`;
+    const invoiceNotes = invoice.notes || shop?.invoice_notes || 'Thank you for your business! If you have any questions about this invoice, please contact us.';
+    const invoiceDeclaration = invoice.declaration || shop?.invoice_declaration || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
 
     const isPaid = (totals.due_amount || 0) <= 0;
 
@@ -307,7 +313,7 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                 <div className="col-span-7 space-y-1">
                     <p className="font-black text-slate-500 uppercase tracking-wider text-[9px]">DECLARATION</p>
                     <p className="text-slate-600 leading-relaxed">
-                        {invoice.declaration || "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct."}
+                        {invoiceDeclaration}
                     </p>
                     <div className="pt-6">
                         <div className="w-44 border-b border-slate-300"></div>

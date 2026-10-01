@@ -37,7 +37,17 @@ const updateProfileSchema = Joi.object({
     address: Joi.string().allow('', null),
     phone: Joi.string().allow('', null),
     email: Joi.string().email().allow('', null),
+    country: Joi.string().valid('IN', 'AE', 'KW').allow('', null),
+    currency: Joi.string().valid('INR', 'AED', 'KWD').allow('', null),
     trn: Joi.string().allow('', null),
+    gstin: Joi.string().allow('', null),
+    cr_number: Joi.string().allow('', null),
+    bank_name: Joi.string().allow('', null),
+    bank_account_number: Joi.string().allow('', null),
+    bank_iban_ifsc: Joi.string().allow('', null),
+    upi_id: Joi.string().allow('', null),
+    invoice_declaration: Joi.string().allow('', null),
+    invoice_notes: Joi.string().allow('', null),
     brand_logo: Joi.string().allow('', null),
     brand_color: Joi.string().allow('', null)
 });
@@ -352,7 +362,27 @@ const getProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
     try {
-        const { username, password, shop_name, address, phone, email, trn, brand_logo, brand_color } = req.body;
+        const {
+            username,
+            password,
+            shop_name,
+            address,
+            phone,
+            email,
+            country,
+            currency,
+            trn,
+            gstin,
+            cr_number,
+            bank_name,
+            bank_account_number,
+            bank_iban_ifsc,
+            upi_id,
+            invoice_declaration,
+            invoice_notes,
+            brand_logo,
+            brand_color
+        } = req.body;
         const user_id = req.user.id;
         const shop_id = req.user.shop_id;
         const user_role = req.user.role;
@@ -384,7 +414,17 @@ const updateProfile = async (req, res) => {
         if (address !== undefined) shop.address = address;
         if (phone !== undefined) shop.phone = phone;
         if (email !== undefined) shop.email = email;
+        if (country) shop.country = country;
+        if (currency) shop.currency = currency;
         if (trn !== undefined) shop.trn = trn;
+        if (gstin !== undefined) shop.gstin = gstin;
+        if (cr_number !== undefined) shop.cr_number = cr_number;
+        if (bank_name !== undefined) shop.bank_name = bank_name;
+        if (bank_account_number !== undefined) shop.bank_account_number = bank_account_number;
+        if (bank_iban_ifsc !== undefined) shop.bank_iban_ifsc = bank_iban_ifsc;
+        if (upi_id !== undefined) shop.upi_id = upi_id;
+        if (invoice_declaration !== undefined) shop.invoice_declaration = invoice_declaration;
+        if (invoice_notes !== undefined) shop.invoice_notes = invoice_notes;
 
         // Handle file upload for logo
         if (req.file) {
@@ -410,6 +450,14 @@ const updateProfile = async (req, res) => {
                 phone: shop.phone,
                 email: shop.email,
                 trn: shop.trn,
+                gstin: shop.gstin,
+                cr_number: shop.cr_number,
+                bank_name: shop.bank_name,
+                bank_account_number: shop.bank_account_number,
+                bank_iban_ifsc: shop.bank_iban_ifsc,
+                upi_id: shop.upi_id,
+                invoice_declaration: shop.invoice_declaration,
+                invoice_notes: shop.invoice_notes,
                 currency: shop.currency,
                 country: shop.country,
                 vat_enabled: shop.vat_enabled,

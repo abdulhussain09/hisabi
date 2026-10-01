@@ -64,6 +64,34 @@ const Shop = sequelize.define('Shop', {
         allowNull: true,
         defaultValue: '#2563eb'
     },
+    cr_number: {
+        type: DataTypes.STRING(50),
+        allowNull: true       // Commercial Registration Number (Kuwait / GCC)
+    },
+    bank_name: {
+        type: DataTypes.STRING(100),
+        allowNull: true
+    },
+    bank_account_number: {
+        type: DataTypes.STRING(50),
+        allowNull: true
+    },
+    bank_iban_ifsc: {
+        type: DataTypes.STRING(50),
+        allowNull: true
+    },
+    upi_id: {
+        type: DataTypes.STRING(100),
+        allowNull: true       // UPI VPA (India QR payment)
+    },
+    invoice_declaration: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    invoice_notes: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
     active: {
         type: DataTypes.BOOLEAN,
         defaultValue: true,

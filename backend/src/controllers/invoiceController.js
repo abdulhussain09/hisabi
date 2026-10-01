@@ -290,14 +290,20 @@ const createInvoice = async (req, res) => {
             place_of_supply_code: place_of_supply_code || null,
             reverse_charge: meta.is_reverse_charge,
             payment_method: payment_method || 'cash',
-            notes: notes || null,
-            declaration: declaration || null,
+            notes: notes || shop.invoice_notes || null,
+            declaration: declaration || shop.invoice_declaration || null,
             seller_name_snapshot: shop.name,
             seller_address_snapshot: shop.address,
             seller_phone_snapshot: shop.phone,
             seller_email_snapshot: shop.email,
-            seller_tax_id_snapshot: shop.trn || shop.gstin,
-            qr_code_data: qr_code_data
+            seller_tax_id_snapshot: shop.trn || shop.gstin || shop.cr_number,
+            seller_cr_number_snapshot: shop.cr_number || null,
+            bank_details_snapshot: (shop.bank_name || shop.bank_account_number) ? {
+                bank_name: shop.bank_name || '',
+                account_number: shop.bank_account_number || '',
+                iban_ifsc: shop.bank_iban_ifsc || ''
+            } : null,
+            qr_code_data: qr_code_data || (shop.country === 'IN' && shop.upi_id ? `upi://pay?pa=${shop.upi_id}&pn=${encodeURIComponent(shop.name)}&am=${totals.grand_total}&cu=INR` : null)
         }, { transaction: t });
 
         // Bulk create InvoiceItems with full snapshot columns

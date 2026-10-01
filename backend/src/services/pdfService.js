@@ -581,7 +581,11 @@ const generateInvoicePDF = (invoice, shop) => {
         doc.fontSize(7).font('Helvetica-Bold');
         setColor(doc, NAVY);
         doc.text('BANK DETAILS', leftMargin + 8, curY + 6);
-        const bank = invoice.bank_details_snapshot || shop?.bank_details || {};
+        const bank = invoice.bank_details_snapshot || (shop?.bank_name ? {
+            bank_name: shop.bank_name,
+            account_number: shop.bank_account_number,
+            iban_ifsc: shop.bank_iban_ifsc
+        } : {});
         let bkY = curY + 18;
         const drawBk = (lbl, val) => {
             doc.fontSize(6.5).font('Helvetica');
@@ -646,7 +650,7 @@ const generateInvoicePDF = (invoice, shop) => {
         doc.fontSize(6.5).font('Helvetica');
         setColor(doc, TEXT_MUTED);
         doc.text(
-            invoice.declaration || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
+            invoice.declaration || shop?.invoice_declaration || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
             leftMargin,
             curY + 9,
             { width: halfSigW }

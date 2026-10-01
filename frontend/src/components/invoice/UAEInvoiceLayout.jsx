@@ -23,18 +23,24 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
     const sellerEmail = invoice.seller_email_snapshot || shop?.email || 'info@hisabi.com';
     const trn = invoice.seller_tax_id_snapshot || shop?.trn || '100000000000003';
 
-    const customerName = invoice.customer_name || 'Abdul';
-    const customerPhone = invoice.customer_phone || '+971 55 123 4567';
-    const customerEmail = invoice.customer_email || 'abdul001@gmail.com';
-    const customerAddress = invoice.customer_address || 'UAE, Dubai\nUnited Arab Emirates';
+    const customerName = invoice.customer_name || 'Walk-in Customer';
+    const customerPhone = invoice.customer_phone || '';
+    const customerEmail = invoice.customer_email || '';
+    const customerAddress = invoice.customer_address || '';
     const buyerTrn = invoice.buyer_tax_id || '';
 
     const paymentMethod = invoice.payment_method ? invoice.payment_method.charAt(0).toUpperCase() + invoice.payment_method.slice(1) : 'Cash';
     const isPaid = (totals.due_amount || 0) <= 0;
 
-    const bank = invoice.bank_details_snapshot || shop?.bank_details || {};
+    const bank = invoice.bank_details_snapshot || (shop?.bank_name ? {
+        bank_name: shop.bank_name,
+        account_number: shop.bank_account_number,
+        iban_ifsc: shop.bank_iban_ifsc
+    } : {});
     const qrData = invoice.qr_code_data || `https://hisabi.com/verify?inv=${invoice.invoice_number}&trn=${trn}`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrData)}`;
+    const invoiceNotes = invoice.notes || shop?.invoice_notes || '';
+    const invoiceDeclaration = invoice.declaration || shop?.invoice_declaration || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
 
     return (
         <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white p-8 box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:p-6 print:w-full print:max-w-none text-[11px] leading-tight">
@@ -328,7 +334,7 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
                 <div className="space-y-1">
                     <p className="font-black text-slate-500 uppercase tracking-wider text-[9px]">Declaration</p>
                     <p className="text-slate-600 leading-relaxed text-[9.5px]">
-                        {invoice.declaration || "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct."}
+                        {invoiceDeclaration}
                     </p>
                     <div className="pt-6">
                         <div className="w-44 border-b border-slate-300"></div>

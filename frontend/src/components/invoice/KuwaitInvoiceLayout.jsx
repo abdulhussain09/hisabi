@@ -26,17 +26,23 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
     const sellerEmail = invoice.seller_email_snapshot || shop?.email || 'support@hisabi.com';
     const crNo = shop?.cr_number || invoice.seller_tax_id_snapshot || '1234567';
 
-    const customerName = invoice.customer_name || 'abdul';
-    const customerPhone = invoice.customer_phone || '9778229812';
-    const customerEmail = invoice.customer_email || 'abdul001@gmail.com';
-    const customerAddress = invoice.customer_address || 'udaipur,rajasthan';
+    const customerName = invoice.customer_name || 'Walk-in Customer';
+    const customerPhone = invoice.customer_phone || '';
+    const customerEmail = invoice.customer_email || '';
+    const customerAddress = invoice.customer_address || '';
 
     const paymentMethod = (invoice.payment_method || 'CASH').toUpperCase();
     const isPaid = (totals.due_amount || 0) <= 0;
 
-    const bank = invoice.bank_details_snapshot || shop?.bank_details || {};
+    const bank = invoice.bank_details_snapshot || (shop?.bank_name ? {
+        bank_name: shop.bank_name,
+        account_number: shop.bank_account_number,
+        iban_ifsc: shop.bank_iban_ifsc
+    } : {});
     const qrData = invoice.qr_code_data || `https://knet.com.kw/pay?inv=${invoice.invoice_number}&amt=${totals.grand_total}`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrData)}`;
+    const invoiceNotes = invoice.notes || shop?.invoice_notes || '';
+    const invoiceDeclaration = invoice.declaration || shop?.invoice_declaration || '';
 
     return (
         <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white p-8 box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:p-6 print:w-full print:max-w-none text-[11px] leading-tight">
@@ -307,8 +313,13 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
                 <div className="bg-slate-50/60 border border-slate-200/80 rounded-xl p-3">
                     <p className="font-black text-[#024282] uppercase text-[9px] mb-1">Notes / ملاحظات</p>
                     <ul className="text-slate-600 space-y-0.5 text-[9px]">
-                        <li>• Thank you for your business!</li>
-                        <li>• If you have any questions about this invoice, please contact us.</li>
+                        {invoiceNotes
+                            ? <li>{invoiceNotes}</li>
+                            : <>
+                                <li>• Thank you for your business!</li>
+                                <li>• If you have any questions about this invoice, please contact us.</li>
+                              </>
+                        }
                     </ul>
                     <p className="text-slate-400 font-arabic text-[8.5px] mt-1 dir-rtl text-right">شكراً لثقتكم بنا! في حال وجود أي استفسارات حول الفاتورة، يرجى التواصل معنا.</p>
                 </div>
@@ -316,7 +327,7 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
                 <div className="bg-slate-50/60 border border-slate-200/80 rounded-xl p-3">
                     <p className="font-black text-[#024282] uppercase text-[9px] mb-1">Declaration / إقرار</p>
                     <p className="text-slate-600 text-[9px] leading-relaxed">
-                        We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+                        {invoiceDeclaration || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.'}
                     </p>
                     <p className="text-slate-400 font-arabic text-[8.5px] mt-1 dir-rtl text-right">
                         نقر بأن هذه الفاتورة توضح السعر الفعلي للبضائع الموضحة وأن جميع البيانات صحيحة ودقيقة.

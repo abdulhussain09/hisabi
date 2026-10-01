@@ -174,6 +174,17 @@ const syncDatabase = async () => {
                 END $$;
             `);
 
+            // Safe columns addition for shop invoice settings & bank details
+            await sequelize.query(`
+                ALTER TABLE "shops" ADD COLUMN IF NOT EXISTS "cr_number" VARCHAR(50);
+                ALTER TABLE "shops" ADD COLUMN IF NOT EXISTS "bank_name" VARCHAR(100);
+                ALTER TABLE "shops" ADD COLUMN IF NOT EXISTS "bank_account_number" VARCHAR(50);
+                ALTER TABLE "shops" ADD COLUMN IF NOT EXISTS "bank_iban_ifsc" VARCHAR(50);
+                ALTER TABLE "shops" ADD COLUMN IF NOT EXISTS "upi_id" VARCHAR(100);
+                ALTER TABLE "shops" ADD COLUMN IF NOT EXISTS "invoice_declaration" TEXT;
+                ALTER TABLE "shops" ADD COLUMN IF NOT EXISTS "invoice_notes" TEXT;
+            `);
+
             // Safe column widening to DECIMAL(12,3) for KWD 3-decimal precision
             await sequelize.query(`
                 ALTER TABLE "products" ALTER COLUMN "cost_price" TYPE DECIMAL(12,3);
