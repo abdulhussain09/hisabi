@@ -1,7 +1,12 @@
 const PDFDocument = require('pdfkit');
+const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 const { createQRMatrix, matrixToBMPBuffer } = require('../utils/qrGenerator');
 const { calculateInvoice } = require('../utils/invoiceCalculationEngine');
-const { getCountryConfig } = require('../config/countryConfig');
+const { getCountryConfig, resolveIndianState } = require('../config/countryConfig');
+const { generateInvoiceHTML } = require('./htmlInvoiceGenerator');
 
 // ─── Color Palette ─────────────────────────────────────────────────────────
 
@@ -41,11 +46,59 @@ function setStroke(doc, hex) {
     doc.strokeColor(hexToRgb(hex));
 }
 
-// ─── Master Invoice PDF Generator ──────────────────────────────────────────
+// ─── Chrome Headless PDF Generator (Exact Visual Parity) ───────────────────
 
-const generateInvoicePDF = (invoice, shop) => {
+async function generateInvoicePDFWithChrome(invoice, shop) {
+    const html = generateInvoiceHTML(invoice, shop);
+    const tmpId = `hisabi_inv_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const tmpHtml = path.join(os.tmpdir(), `${tmpId}.html`);
+    const tmpPdf = path.join(os.tmpdir(), `${tmpId}.pdf`);
+
+    await fs.promises.writeFile(tmpHtml, html, 'utf8');
+
     return new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ size: 'A4', margin: 30, bufferPages: true });
+        const cmd = `google-chrome --headless --disable-gpu --no-sandbox --no-pdf-header-footer --print-to-pdf="${tmpPdf}" "${tmpHtml}"`;
+        exec(cmd, { timeout: 15000 }, async (error) => {
+            try {
+                if (error) {
+                    throw error;
+                }
+                const buffer = await fs.promises.readFile(tmpPdf);
+                fs.unlink(tmpHtml, () => {});
+                fs.unlink(tmpPdf, () => {});
+                resolve(buffer);
+            } catch (err) {
+                fs.unlink(tmpHtml, () => {});
+                fs.unlink(tmpPdf, () => {});
+                reject(err);
+            }
+        });
+    });
+}
+
+// ─── Master PDF Generator (Chrome first, PDFKit resilient fallback) ─────────
+
+const generateInvoicePDF = async (invoice, shop) => {
+    try {
+        const buffer = await generateInvoicePDFWithChrome(invoice, shop);
+        if (buffer && buffer.length > 0) {
+            return buffer;
+        }
+    } catch (err) {
+        console.warn('Chrome PDF generator unavailable, using PDFKit fallback:', err.message);
+    }
+    return generateInvoicePDFKit(invoice, shop);
+};
+
+// ─── PDFKit Fallback Generator ─────────────────────────────────────────────
+
+const generateInvoicePDFKit = (invoice, shop) => {
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({
+            size: 'A4',
+            margins: { top: 25, bottom: 20, left: 30, right: 30 },
+            bufferPages: true
+        });
         const chunks = [];
 
         doc.on('data', chunk => chunks.push(chunk));
@@ -53,7 +106,7 @@ const generateInvoicePDF = (invoice, shop) => {
         doc.on('error', reject);
 
         const leftMargin = 30;
-        const topMargin = 30;
+        const topMargin = 25;
         const pageWidth = doc.page.width - 60; // 595.28 - 60 = 535.28
         const country = invoice.country || shop?.country || 'AE';
         const countryConfig = getCountryConfig(country);
@@ -87,6 +140,11 @@ const generateInvoicePDF = (invoice, shop) => {
         const paymentMethod = (invoice.payment_method || 'CASH').toUpperCase();
         const isPaid = (totals.due_amount || 0) <= 0;
 
+        // Resolve Place of Supply dynamically (No hardcoded defaults)
+        const resolvedPlace = resolveIndianState(invoice.place_of_supply_state, invoice.place_of_supply_code);
+        const placeState = resolvedPlace.state || '—';
+        const placeCode = resolvedPlace.code || '—';
+
         // QR Code BMP Generation
         let qrBmp = null;
         try {
@@ -105,78 +163,83 @@ const generateInvoicePDF = (invoice, shop) => {
         let curY = topMargin;
 
         // Brand Icon & Text
-        doc.roundedRect(leftMargin, curY, 24, 24, 6);
+        doc.roundedRect(leftMargin, curY, 26, 26, 6);
         setColor(doc, SKY);
         doc.fill();
-        doc.fontSize(14).font('Helvetica-Bold');
+        doc.fontSize(15).font('Helvetica-Bold');
         setColor(doc, '#ffffff');
-        doc.text('H', leftMargin, curY + 5, { width: 24, align: 'center' });
+        doc.text('H', leftMargin, curY + 5, { width: 26, align: 'center' });
 
-        doc.fontSize(18).font('Helvetica-Bold');
+        doc.fontSize(20).font('Helvetica-Bold');
         setColor(doc, TEXT_MAIN);
-        doc.text('Hisabi', leftMargin + 30, curY);
+        doc.text('Hisabi', leftMargin + 32, curY);
 
-        doc.fontSize(7.5).font('Helvetica');
+        doc.fontSize(8.5).font('Helvetica');
         setColor(doc, TEXT_MUTED);
-        const tagLine = country === 'IN' ? 'Smart Billing | Inventory | Business Growth' : (country === 'AE' ? 'SMART POS & INVENTORY SOLUTIONS' : 'Smart POS & Inventory for Modern Businesses');
-        doc.text(tagLine, leftMargin + 30, curY + 16);
+        const tagLine = country === 'IN'
+            ? 'Smart Billing | Inventory | Business Growth'
+            : (country === 'AE' ? 'SMART POS & INVENTORY SOLUTIONS' : 'Smart POS & Inventory for Modern Businesses');
+        doc.text(tagLine, leftMargin + 32, curY + 18);
 
         // Shop Contact / Address below brand
-        let shopContactY = curY + 28;
-        doc.fontSize(8.5).font('Helvetica-Bold');
+        let shopContactY = curY + 32;
+        doc.fontSize(10).font('Helvetica-Bold');
         setColor(doc, TEXT_MAIN);
         doc.text(sellerName, leftMargin, shopContactY);
-        shopContactY += 10;
+        shopContactY += 12;
 
-        doc.fontSize(7.5).font('Helvetica');
+        doc.fontSize(8.5).font('Helvetica');
         setColor(doc, TEXT_MUTED);
         if (sellerAddress) {
-            doc.text(sellerAddress, leftMargin, shopContactY, { width: 180 });
-            shopContactY += 9;
+            const addrH = doc.heightOfString(sellerAddress, { width: 190 });
+            doc.text(sellerAddress, leftMargin, shopContactY, { width: 190 });
+            shopContactY += addrH + 2;
         }
         if (sellerPhone || sellerEmail) {
-            doc.text([sellerPhone, sellerEmail].filter(Boolean).join('  |  '), leftMargin, shopContactY, { width: 180 });
-            shopContactY += 9;
+            const contactText = [sellerPhone, sellerEmail].filter(Boolean).join('  |  ');
+            const contactH = doc.heightOfString(contactText, { width: 190 });
+            doc.text(contactText, leftMargin, shopContactY, { width: 190 });
+            shopContactY += contactH + 2;
         }
 
         // Center: Tax ID (GSTIN / TRN / CR)
         const taxId = invoice.seller_tax_id_snapshot || shop?.trn || shop?.gstin || shop?.cr_number;
         if (taxId) {
             const taxLabel = country === 'IN' ? 'GSTIN NO' : (country === 'AE' ? 'TRN' : 'CR NO');
-            doc.fontSize(7.5).font('Helvetica-Bold');
+            doc.fontSize(8).font('Helvetica-Bold');
             setColor(doc, TEXT_MUTED);
-            doc.text(taxLabel, leftMargin + 190, curY + 8, { width: 140, align: 'center' });
-            doc.fontSize(9.5).font('Helvetica-Bold');
+            doc.text(taxLabel, leftMargin + 195, curY + 8, { width: 145, align: 'center' });
+            doc.fontSize(10).font('Helvetica-Bold');
             setColor(doc, NAVY);
-            doc.text(`${taxId}`, leftMargin + 190, curY + 18, { width: 140, align: 'center' });
+            doc.text(`${taxId}`, leftMargin + 195, curY + 20, { width: 145, align: 'center' });
         }
 
         // Right: Title & Metadata Table
         const invTitle = country === 'IN' ? 'TAX INVOICE' : (country === 'AE' ? 'TAX INVOICE' : 'INVOICE');
-        doc.fontSize(16).font('Helvetica-Bold');
+        doc.fontSize(18).font('Helvetica-Bold');
         setColor(doc, NAVY);
-        doc.text(invTitle, leftMargin + 330, curY, { width: pageWidth - 330, align: 'right' });
+        doc.text(invTitle, leftMargin + 320, curY, { width: pageWidth - 320, align: 'right' });
 
         if (country === 'IN') {
-            doc.fontSize(7.5).font('Helvetica-Bold');
+            doc.fontSize(8.5).font('Helvetica-Bold');
             setColor(doc, TEXT_MUTED);
-            doc.text('(GST INVOICE)', leftMargin + 330, curY + 15, { width: pageWidth - 330, align: 'right' });
+            doc.text('(GST INVOICE)', leftMargin + 320, curY + 18, { width: pageWidth - 320, align: 'right' });
         } else if (country === 'AE' || country === 'KW') {
-            doc.fontSize(8).font('Helvetica');
+            doc.fontSize(8.5).font('Helvetica');
             setColor(doc, TEXT_MUTED);
-            doc.text('Simpler. Smarter. Together.', leftMargin + 330, curY + 15, { width: pageWidth - 330, align: 'right' });
+            doc.text('Simpler. Smarter. Together.', leftMargin + 320, curY + 18, { width: pageWidth - 320, align: 'right' });
         }
 
         // Right Metadata Lines
-        let metaY = curY + 28;
+        let metaY = curY + 32;
         const drawMetaLine = (lbl, val) => {
-            doc.fontSize(7.5).font('Helvetica');
+            doc.fontSize(8).font('Helvetica');
             setColor(doc, TEXT_MUTED);
             doc.text(lbl, leftMargin + 350, metaY, { width: 75, align: 'right' });
-            doc.fontSize(8).font('Helvetica-Bold');
+            doc.fontSize(8.5).font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
             doc.text(val, leftMargin + 430, metaY, { width: pageWidth - 430, align: 'left' });
-            metaY += 10;
+            metaY += 11;
         };
 
         drawMetaLine('Invoice No. :', `#INV-${String(invoice.invoice_number || '1').padStart(4, '0')}`);
@@ -185,100 +248,79 @@ const generateInvoicePDF = (invoice, shop) => {
         drawMetaLine('Payment :', paymentMethod);
 
         // Header Divider Line
-        curY = Math.max(shopContactY, metaY) + 8;
+        curY = Math.max(shopContactY, metaY) + 6;
         setStroke(doc, BORDER);
         doc.moveTo(leftMargin, curY).lineTo(leftMargin + pageWidth, curY).lineWidth(0.5).stroke();
-        curY += 8;
+        curY += 7;
 
         // ═════════════════════════════════════════════════════════════════════
         // 2. BILL TO & SUPPLY / PLACE OF SUPPLY CARDS
         // ═════════════════════════════════════════════════════════════════════
-        const cardH = 58;
+        const cardH = 54;
         if (country === 'IN') {
-            const cardW1 = (pageWidth - 16) * 0.50;
-            const cardW2 = (pageWidth - 16) * 0.25;
-            const cardW3 = (pageWidth - 16) * 0.25;
+            const cardW1 = (pageWidth - 10) * 0.65;
+            const cardW2 = (pageWidth - 10) * 0.35;
 
             // Card 1: Bill To
-            doc.roundedRect(leftMargin, curY, cardW1, cardH, 6);
+            doc.roundedRect(leftMargin, curY, cardW1, cardH, 5);
             setColor(doc, BG_CARD);
             doc.fill();
             setStroke(doc, BORDER);
-            doc.roundedRect(leftMargin, curY, cardW1, cardH, 6).lineWidth(0.5).stroke();
+            doc.roundedRect(leftMargin, curY, cardW1, cardH, 5).lineWidth(0.5).stroke();
 
-            doc.fontSize(7).font('Helvetica-Bold');
+            doc.fontSize(8).font('Helvetica-Bold');
             setColor(doc, NAVY);
             doc.text('BILL TO', leftMargin + 8, curY + 6);
-            doc.fontSize(9).font('Helvetica-Bold');
+            doc.fontSize(10).font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
             doc.text(customerName, leftMargin + 8, curY + 16, { width: cardW1 - 16 });
-            doc.fontSize(7).font('Helvetica');
+            doc.fontSize(8).font('Helvetica');
             setColor(doc, TEXT_MUTED);
             let bY = curY + 28;
-            if (customerPhone) { doc.text(`Phone: ${customerPhone}`, leftMargin + 8, bY); bY += 8; }
+            if (customerPhone) { doc.text(`Phone: ${customerPhone}`, leftMargin + 8, bY); bY += 9; }
             if (customerAddress) { doc.text(`Address: ${customerAddress}`, leftMargin + 8, bY, { width: cardW1 - 16 }); }
 
-            // Card 2: Place of Supply
-            const c2X = leftMargin + cardW1 + 8;
-            doc.roundedRect(c2X, curY, cardW2, cardH, 6);
+            // Card 2: Place of Supply (Dynamic with no hardcoded fallback)
+            const c2X = leftMargin + cardW1 + 10;
+            doc.roundedRect(c2X, curY, cardW2, cardH, 5);
             setColor(doc, BG_CARD);
             doc.fill();
             setStroke(doc, BORDER);
-            doc.roundedRect(c2X, curY, cardW2, cardH, 6).lineWidth(0.5).stroke();
+            doc.roundedRect(c2X, curY, cardW2, cardH, 5).lineWidth(0.5).stroke();
 
-            doc.fontSize(7).font('Helvetica-Bold');
+            doc.fontSize(8).font('Helvetica-Bold');
             setColor(doc, NAVY);
             doc.text('PLACE OF SUPPLY', c2X + 8, curY + 6);
-            doc.fontSize(7.5).font('Helvetica');
+            doc.fontSize(8).font('Helvetica');
             setColor(doc, TEXT_MUTED);
-            doc.text('State:', c2X + 8, curY + 20);
+            doc.text('State:', c2X + 8, curY + 19);
             doc.font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
-            doc.text(invoice.place_of_supply_state || 'Rajasthan', c2X + 38, curY + 20);
+            doc.text(placeState, c2X + 42, curY + 19, { width: cardW2 - 46 });
             doc.font('Helvetica');
             setColor(doc, TEXT_MUTED);
             doc.text('Code:', c2X + 8, curY + 32);
             doc.font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
-            doc.text(invoice.place_of_supply_code || '08', c2X + 38, curY + 32);
-
-            // Card 3: Payment Method
-            const c3X = c2X + cardW2 + 8;
-            doc.roundedRect(c3X, curY, cardW3, cardH, 6);
-            setColor(doc, BG_CARD);
-            doc.fill();
-            setStroke(doc, BORDER);
-            doc.roundedRect(c3X, curY, cardW3, cardH, 6).lineWidth(0.5).stroke();
-
-            doc.fontSize(7).font('Helvetica-Bold');
-            setColor(doc, NAVY);
-            doc.text('PAYMENT METHOD', c3X + 8, curY + 6);
-            doc.roundedRect(c3X + 8, curY + 22, cardW3 - 16, 18, 4);
-            setColor(doc, '#ffffff');
-            doc.fill();
-            setStroke(doc, BORDER);
-            doc.roundedRect(c3X + 8, curY + 22, cardW3 - 16, 18, 4).lineWidth(0.5).stroke();
-            doc.fontSize(8.5).font('Helvetica-Bold');
-            setColor(doc, TEXT_MAIN);
-            doc.text(paymentMethod, c3X + 8, curY + 27, { width: cardW3 - 16, align: 'center' });
+            doc.text(placeCode, c2X + 42, curY + 32, { width: cardW2 - 46 });
         } else {
             // UAE / KW: 2 Cards (Bill To & Supply Details)
             const halfW = (pageWidth - 8) / 2;
 
             // Bill To
-            doc.roundedRect(leftMargin, curY, halfW, cardH, 6);
+            doc.roundedRect(leftMargin, curY, halfW, cardH, 5);
             setColor(doc, BG_CARD);
             doc.fill();
             setStroke(doc, BORDER);
-            doc.roundedRect(leftMargin, curY, halfW, cardH, 6).lineWidth(0.5).stroke();
+            doc.roundedRect(leftMargin, curY, halfW, cardH, 5).lineWidth(0.5).stroke();
 
-            doc.fontSize(7).font('Helvetica-Bold');
+            doc.fontSize(8).font('Helvetica-Bold');
             setColor(doc, NAVY);
             doc.text(country === 'AE' ? 'BILL TO / المشتري' : 'BILL TO / العميل', leftMargin + 8, curY + 6);
-            doc.fontSize(9).font('Helvetica-Bold');
+            doc.fontSize(10).font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
             doc.text(customerName, leftMargin + 8, curY + 16, { width: halfW - 16 });
-            doc.fontSize(7.5).font('Helvetica');
+            doc.fontSize(8).font('Helvetica');
             setColor(doc, TEXT_MUTED);
             let bY = curY + 28;
             if (customerPhone) { doc.text(`Ph: ${customerPhone}`, leftMargin + 8, bY); bY += 9; }
@@ -286,62 +328,62 @@ const generateInvoicePDF = (invoice, shop) => {
 
             // Supply / Delivery Details
             const c2X = leftMargin + halfW + 8;
-            doc.roundedRect(c2X, curY, halfW, cardH, 6);
+            doc.roundedRect(c2X, curY, halfW, cardH, 5);
             setColor(doc, BG_CARD);
             doc.fill();
             setStroke(doc, BORDER);
-            doc.roundedRect(c2X, curY, halfW, cardH, 6).lineWidth(0.5).stroke();
+            doc.roundedRect(c2X, curY, halfW, cardH, 5).lineWidth(0.5).stroke();
 
-            doc.fontSize(7).font('Helvetica-Bold');
+            doc.fontSize(8).font('Helvetica-Bold');
             setColor(doc, NAVY);
             doc.text(country === 'AE' ? 'SUPPLY TO / جهة التوريد' : 'SUPPLY DETAILS / تفاصيل التوريد', c2X + 8, curY + 6);
-            doc.fontSize(7.5).font('Helvetica');
+            doc.fontSize(8).font('Helvetica');
             setColor(doc, TEXT_MUTED);
-            doc.text('Supply Date:', c2X + 8, curY + 20);
+            doc.text('Supply Date:', c2X + 8, curY + 19);
             doc.font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
-            doc.text(invoice.supply_date ? formatDate(invoice.supply_date) : dateStr, c2X + 70, curY + 20);
+            doc.text(invoice.supply_date ? formatDate(invoice.supply_date) : dateStr, c2X + 70, curY + 19);
 
             doc.font('Helvetica');
             setColor(doc, TEXT_MUTED);
-            doc.text('Delivery Address:', c2X + 8, curY + 32);
+            doc.text('Delivery Address:', c2X + 8, curY + 31);
             doc.font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
-            doc.text(customerAddress || sellerAddress || '—', c2X + 70, curY + 32, { width: halfW - 78 });
+            doc.text(customerAddress || sellerAddress || '—', c2X + 70, curY + 31, { width: halfW - 78 });
         }
 
-        curY += cardH + 10;
+        curY += cardH + 8;
 
         // ═════════════════════════════════════════════════════════════════════
         // 3. ITEMS TABLE
         // ═════════════════════════════════════════════════════════════════════
         const tableTop = curY;
-        const thH = 18;
+        const thH = 20;
 
         // Draw Table Header
         doc.roundedRect(leftMargin, tableTop, pageWidth, thH, 4);
         setColor(doc, NAVY);
         doc.fill();
 
-        doc.fontSize(7).font('Helvetica-Bold');
+        doc.fontSize(8).font('Helvetica-Bold');
         setColor(doc, '#ffffff');
 
         // Column Coordinates per Country
         let cols = [];
         if (country === 'IN') {
             cols = [
-                { id: 'sno', label: 'S.No', x: leftMargin + 4, w: 22, align: 'center' },
-                { id: 'hsn', label: 'HSN/SAC', x: leftMargin + 26, w: 42, align: 'center' },
-                { id: 'desc', label: 'Description of Goods', x: leftMargin + 70, w: 145, align: 'left' },
-                { id: 'qty', label: 'Qty', x: leftMargin + 217, w: 28, align: 'center' },
-                { id: 'mrp', label: 'MRP', x: leftMargin + 247, w: 35, align: 'right' },
-                { id: 'rate', label: 'Rate', x: leftMargin + 284, w: 35, align: 'right' },
-                { id: 'disc', label: 'Disc', x: leftMargin + 321, w: 30, align: 'right' },
-                { id: 'taxable', label: 'Taxable', x: leftMargin + 353, w: 45, align: 'right' },
-                { id: 'rate_pct', label: 'GST %', x: leftMargin + 400, w: 30, align: 'center' },
-                { id: 'cgst', label: 'CGST', x: leftMargin + 432, w: 32, align: 'right' },
-                { id: 'sgst', label: 'SGST', x: leftMargin + 466, w: 32, align: 'right' },
-                { id: 'total', label: 'Total (₹)', x: leftMargin + 500, w: 33, align: 'right' }
+                { id: 'sno', label: 'S.No', x: leftMargin + 3, w: 22, align: 'center' },
+                { id: 'hsn', label: 'HSN/SAC', x: leftMargin + 25, w: 42, align: 'center' },
+                { id: 'desc', label: 'Description of Goods', x: leftMargin + 69, w: 142, align: 'left' },
+                { id: 'qty', label: 'Qty', x: leftMargin + 213, w: 28, align: 'center' },
+                { id: 'mrp', label: 'MRP', x: leftMargin + 243, w: 34, align: 'right' },
+                { id: 'rate', label: 'Rate', x: leftMargin + 279, w: 34, align: 'right' },
+                { id: 'disc', label: 'Disc', x: leftMargin + 315, w: 30, align: 'right' },
+                { id: 'taxable', label: 'Taxable', x: leftMargin + 347, w: 46, align: 'right' },
+                { id: 'rate_pct', label: 'GST %', x: leftMargin + 395, w: 30, align: 'center' },
+                { id: 'cgst', label: 'CGST', x: leftMargin + 427, w: 33, align: 'right' },
+                { id: 'sgst', label: 'SGST', x: leftMargin + 462, w: 33, align: 'right' },
+                { id: 'total', label: 'Total (₹)', x: leftMargin + 497, w: 35, align: 'right' }
             ];
         } else if (country === 'AE') {
             cols = [
@@ -369,12 +411,12 @@ const generateInvoicePDF = (invoice, shop) => {
         }
 
         cols.forEach(col => {
-            doc.text(col.label, col.x, tableTop + 5, { width: col.w, align: col.align });
+            doc.text(col.label, col.x, tableTop + 6, { width: col.w, align: col.align });
         });
 
         let rowY = tableTop + thH;
         calcItems.forEach((item, idx) => {
-            const rowH = item.item_description ? 24 : 17;
+            const rowH = item.item_description ? 26 : 19;
             if (idx % 2 === 1) {
                 doc.rect(leftMargin, rowY, pageWidth, rowH);
                 setColor(doc, BG_CARD);
@@ -385,7 +427,7 @@ const generateInvoicePDF = (invoice, shop) => {
             doc.moveTo(leftMargin, rowY + rowH).lineTo(leftMargin + pageWidth, rowY + rowH).lineWidth(0.5).stroke();
 
             const textY = rowY + 4;
-            doc.fontSize(7.5).font('Helvetica-Bold');
+            doc.fontSize(8.5).font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
 
             if (country === 'IN') {
@@ -395,10 +437,10 @@ const generateInvoicePDF = (invoice, shop) => {
                 doc.font('Helvetica-Bold');
                 doc.text(item.item_name, cols[2].x, textY, { width: cols[2].w, align: cols[2].align });
                 if (item.item_description) {
-                    doc.fontSize(6.5).font('Helvetica');
+                    doc.fontSize(7.5).font('Helvetica');
                     setColor(doc, TEXT_MUTED);
-                    doc.text(item.item_description, cols[2].x, textY + 9, { width: cols[2].w });
-                    doc.fontSize(7.5);
+                    doc.text(item.item_description, cols[2].x, textY + 10, { width: cols[2].w });
+                    doc.fontSize(8.5);
                 }
                 setColor(doc, TEXT_MAIN);
                 doc.font('Helvetica');
@@ -418,10 +460,10 @@ const generateInvoicePDF = (invoice, shop) => {
                 doc.text(String(idx + 1), cols[0].x, textY, { width: cols[0].w, align: cols[0].align });
                 doc.text(item.item_name, cols[1].x, textY, { width: cols[1].w, align: cols[1].align });
                 if (item.item_description) {
-                    doc.fontSize(6.5).font('Helvetica');
+                    doc.fontSize(7.5).font('Helvetica');
                     setColor(doc, TEXT_MUTED);
-                    doc.text(item.item_description, cols[1].x, textY + 9, { width: cols[1].w });
-                    doc.fontSize(7.5);
+                    doc.text(item.item_description, cols[1].x, textY + 10, { width: cols[1].w });
+                    doc.fontSize(8.5);
                 }
                 setColor(doc, TEXT_MAIN);
                 doc.font('Helvetica');
@@ -441,10 +483,10 @@ const generateInvoicePDF = (invoice, shop) => {
                 doc.text(String(idx + 1), cols[0].x, textY, { width: cols[0].w, align: cols[0].align });
                 doc.text(item.item_name, cols[1].x, textY, { width: cols[1].w, align: cols[1].align });
                 if (item.item_description) {
-                    doc.fontSize(6.5).font('Helvetica');
+                    doc.fontSize(7.5).font('Helvetica');
                     setColor(doc, TEXT_MUTED);
-                    doc.text(item.item_description, cols[1].x, textY + 9, { width: cols[1].w });
-                    doc.fontSize(7.5);
+                    doc.text(item.item_description, cols[1].x, textY + 10, { width: cols[1].w });
+                    doc.fontSize(8.5);
                 }
                 setColor(doc, TEXT_MAIN);
                 doc.font('Helvetica');
@@ -458,29 +500,31 @@ const generateInvoicePDF = (invoice, shop) => {
             rowY += rowH;
         });
 
-        curY = rowY + 10;
-
         // ═════════════════════════════════════════════════════════════════════
-        // 4. TAX SUMMARY & TOTALS SECTION
+        // 4. ATTACHED TOTALS & TAX SUMMARY SECTION (NO VERTICAL GAP)
         // ═════════════════════════════════════════════════════════════════════
         const totalsW = 210;
-        const leftBoxW = pageWidth - totalsW - 12;
+        const leftBoxW = pageWidth - totalsW;
+        const attachedH = country === 'IN' ? 64 : 58;
+
+        // Container attached directly to the bottom of the table
+        setColor(doc, BG_CARD);
+        doc.rect(leftMargin, rowY, pageWidth, attachedH).fill();
+        setStroke(doc, BORDER);
+        doc.rect(leftMargin, rowY, pageWidth, attachedH).lineWidth(0.5).stroke();
+
+        // Vertical divider separating Left Box (Tax summary) and Right Box (Totals)
+        doc.moveTo(leftMargin + leftBoxW, rowY).lineTo(leftMargin + leftBoxW, rowY + attachedH).lineWidth(0.5).stroke();
 
         if (country === 'IN') {
             // Left: GST Tax Summary
-            doc.roundedRect(leftMargin, curY, leftBoxW, 58, 6);
-            setColor(doc, BG_CARD);
-            doc.fill();
-            setStroke(doc, BORDER);
-            doc.roundedRect(leftMargin, curY, leftBoxW, 58, 6).lineWidth(0.5).stroke();
-
-            doc.fontSize(7.5).font('Helvetica-Bold');
+            doc.fontSize(8).font('Helvetica-Bold');
             setColor(doc, NAVY);
-            doc.text('GST TAX SUMMARY', leftMargin + 8, curY + 6);
+            doc.text('GST TAX SUMMARY', leftMargin + 8, rowY + 6);
 
-            // Table header
-            const stY = curY + 18;
-            doc.fontSize(6.5).font('Helvetica-Bold');
+            // Sub-table headers
+            const stY = rowY + 18;
+            doc.fontSize(7.5).font('Helvetica-Bold');
             setColor(doc, TEXT_MUTED);
             const subW = (leftBoxW - 16) / 5;
             doc.text('Taxable (₹)', leftMargin + 8, stY, { width: subW });
@@ -489,8 +533,13 @@ const generateInvoicePDF = (invoice, shop) => {
             doc.text('IGST (₹)', leftMargin + 8 + subW * 3, stY, { width: subW, align: 'right' });
             doc.text('Total Tax (₹)', leftMargin + 8 + subW * 4, stY, { width: subW, align: 'right' });
 
-            const svY = stY + 11;
-            doc.fontSize(7.5).font('Helvetica-Bold');
+            // Divider
+            setStroke(doc, BORDER);
+            doc.moveTo(leftMargin + 8, stY + 11).lineTo(leftMargin + leftBoxW - 8, stY + 11).lineWidth(0.5).stroke();
+
+            // Sub-table values
+            const svY = stY + 14;
+            doc.fontSize(8.5).font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
             doc.text(formatDec(totals.taxable_total, currency), leftMargin + 8, svY, { width: subW });
             doc.text(formatDec(totals.cgst_total, currency), leftMargin + 8 + subW, svY, { width: subW, align: 'right' });
@@ -500,48 +549,36 @@ const generateInvoicePDF = (invoice, shop) => {
             doc.text(formatDec(totals.tax_total, currency), leftMargin + 8 + subW * 4, svY, { width: subW, align: 'right' });
         } else {
             // Left: Payment Status & Amount in Words
-            doc.roundedRect(leftMargin, curY, leftBoxW, 58, 6);
-            setColor(doc, BG_CARD);
-            doc.fill();
-            setStroke(doc, BORDER);
-            doc.roundedRect(leftMargin, curY, leftBoxW, 58, 6).lineWidth(0.5).stroke();
-
-            doc.fontSize(7).font('Helvetica-Bold');
+            doc.fontSize(8).font('Helvetica-Bold');
             setColor(doc, TEXT_MUTED);
-            doc.text('PAYMENT STATUS', leftMargin + 8, curY + 6);
-            doc.fontSize(8.5).font('Helvetica-Bold');
+            doc.text('PAYMENT STATUS', leftMargin + 8, rowY + 6);
+            doc.fontSize(9).font('Helvetica-Bold');
             setColor(doc, isPaid ? '#166534' : '#b45309');
-            doc.text(isPaid ? 'PAID' : 'PARTIAL', leftMargin + 8, curY + 16);
+            doc.text(isPaid ? 'PAID' : 'PARTIAL', leftMargin + 8, rowY + 17);
 
-            doc.fontSize(7).font('Helvetica');
+            doc.fontSize(8).font('Helvetica');
             setColor(doc, TEXT_MUTED);
-            doc.text(`Paid: ${currency} ${formatDec(totals.paid_amount, currency)} on ${dateStr}`, leftMargin + 50, curY + 17);
+            doc.text(`Paid: ${currency} ${formatDec(totals.paid_amount, currency)} on ${dateStr}`, leftMargin + 50, rowY + 18);
 
-            doc.fontSize(7).font('Helvetica-Bold');
+            doc.fontSize(8).font('Helvetica-Bold');
             setColor(doc, TEXT_MUTED);
-            doc.text('AMOUNT IN WORDS', leftMargin + 8, curY + 32);
-            doc.fontSize(7.5).font('Helvetica-Bold');
+            doc.text('AMOUNT IN WORDS', leftMargin + 8, rowY + 33);
+            doc.fontSize(8.5).font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
-            doc.text(totals.amount_in_words, leftMargin + 8, curY + 42, { width: leftBoxW - 16 });
+            doc.text(totals.amount_in_words, leftMargin + 8, rowY + 43, { width: leftBoxW - 16 });
         }
 
-        // Right: Totals Box
-        const tBoxX = leftMargin + leftBoxW + 12;
-        doc.roundedRect(tBoxX, curY, totalsW, 58, 6);
-        setColor(doc, BG_CARD);
-        doc.fill();
-        setStroke(doc, BORDER);
-        doc.roundedRect(tBoxX, curY, totalsW, 58, 6).lineWidth(0.5).stroke();
-
-        let tY = curY + 6;
+        // Right: Attached Totals Box
+        const tBoxX = leftMargin + leftBoxW;
+        let tY = rowY + 5;
         const drawTRow = (lbl, val) => {
-            doc.fontSize(7.5).font('Helvetica');
+            doc.fontSize(8.5).font('Helvetica');
             setColor(doc, TEXT_MUTED);
-            doc.text(lbl, tBoxX + 8, tY);
+            doc.text(lbl, tBoxX + 10, tY);
             doc.font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
-            doc.text(val, tBoxX + 8, tY, { width: totalsW - 16, align: 'right' });
-            tY += 10;
+            doc.text(val, tBoxX + 10, tY, { width: totalsW - 20, align: 'right' });
+            tY += 11;
         };
 
         drawTRow('Subtotal', `${currency} ${formatDec(totals.gross_subtotal, currency)}`);
@@ -549,36 +586,78 @@ const generateInvoicePDF = (invoice, shop) => {
         if (totals.tax_total > 0 && country !== 'IN') drawTRow('VAT Total', `+${currency} ${formatDec(totals.tax_total, currency)}`);
         if (totals.round_off !== 0) drawTRow('Round Off', `${currency} ${formatDec(totals.round_off, currency)}`);
 
-        // Grand Total Banner
-        const gtH = 18;
-        const gtY = curY + 58 - gtH - 3;
-        doc.roundedRect(tBoxX + 3, gtY, totalsW - 6, gtH, 4);
+        // Grand Total Banner (Flushed cleanly inside attached container)
+        const gtH = 19;
+        const gtY = rowY + attachedH - gtH;
+        doc.rect(tBoxX, gtY, totalsW, gtH);
         setColor(doc, NAVY);
         doc.fill();
 
-        doc.fontSize(8.5).font('Helvetica-Bold');
+        doc.fontSize(9.5).font('Helvetica-Bold');
         setColor(doc, '#ffffff');
         doc.text('GRAND TOTAL', tBoxX + 10, gtY + 5);
-        doc.text(`${currency} ${formatDec(totals.grand_total, currency)}`, tBoxX + 10, gtY + 5, { width: totalsW - 26, align: 'right' });
+        doc.fontSize(10.5);
+        doc.text(`${currency} ${formatDec(totals.grand_total, currency)}`, tBoxX + 10, gtY + 4, { width: totalsW - 20, align: 'right' });
 
-        curY += 68;
+        curY = rowY + attachedH + 8;
 
         // ═════════════════════════════════════════════════════════════════════
-        // 5. BANK DETAILS & QR CODE & CONTACT SECTION
+        // 5. AMOUNT IN WORDS & PAYMENT STATUS (INDIA SPECIFIC ROW)
         // ═════════════════════════════════════════════════════════════════════
-        const bH = 64;
+        if (country === 'IN') {
+            const w1 = (pageWidth - 8) * 0.58;
+            const w2 = (pageWidth - 8) * 0.42;
+
+            // Amount in words card
+            doc.roundedRect(leftMargin, curY, w1, 40, 5);
+            setColor(doc, BG_CARD);
+            doc.fill();
+            setStroke(doc, BORDER);
+            doc.roundedRect(leftMargin, curY, w1, 40, 5).lineWidth(0.5).stroke();
+
+            doc.fontSize(7.5).font('Helvetica-Bold');
+            setColor(doc, NAVY);
+            doc.text('AMOUNT IN WORDS', leftMargin + 8, curY + 6);
+            doc.fontSize(8.5).font('Helvetica-Bold');
+            setColor(doc, TEXT_MAIN);
+            doc.text(totals.amount_in_words, leftMargin + 8, curY + 18, { width: w1 - 16 });
+
+            // Payment status card
+            const pX = leftMargin + w1 + 8;
+            doc.roundedRect(pX, curY, w2, 40, 5);
+            setColor(doc, BG_CARD);
+            doc.fill();
+            setStroke(doc, BORDER);
+            doc.roundedRect(pX, curY, w2, 40, 5).lineWidth(0.5).stroke();
+
+            doc.fontSize(8).font('Helvetica-Bold');
+            setColor(doc, isPaid ? '#166534' : '#b45309');
+            doc.text(`Payment Status: ${isPaid ? 'PAID' : 'PARTIAL'}`, pX + 8, curY + 6);
+
+            doc.fontSize(8).font('Helvetica');
+            setColor(doc, TEXT_MUTED);
+            doc.text(`Paid: ${currency} ${formatDec(totals.paid_amount, currency)}`, pX + 8, curY + 18);
+            doc.text(`Balance Due: ${currency} ${formatDec(totals.due_amount, currency)}`, pX + 8, curY + 28);
+
+            curY += 46;
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // 6. BANK DETAILS & QR CODE & CONTACT SECTION
+        // ═════════════════════════════════════════════════════════════════════
+        const bH = 62;
         const b1W = (pageWidth - 16) * 0.45;
         const b2W = (pageWidth - 16) * 0.25;
         const b3W = (pageWidth - 16) * 0.30;
 
         // Card 1: Bank Details
-        doc.roundedRect(leftMargin, curY, b1W, bH, 6);
+        doc.roundedRect(leftMargin, curY, b1W, bH, 5);
         setColor(doc, BG_CARD);
         doc.fill();
         setStroke(doc, BORDER);
-        doc.roundedRect(leftMargin, curY, b1W, bH, 6).lineWidth(0.5).stroke();
+        doc.roundedRect(leftMargin, curY, b1W, bH, 5).lineWidth(0.5).stroke();
 
-        doc.fontSize(7).font('Helvetica-Bold');
+        doc.fontSize(8).font('Helvetica-Bold');
         setColor(doc, NAVY);
         doc.text('BANK DETAILS', leftMargin + 8, curY + 6);
         const bank = invoice.bank_details_snapshot || (shop?.bank_name ? {
@@ -588,13 +667,13 @@ const generateInvoicePDF = (invoice, shop) => {
         } : {});
         let bkY = curY + 18;
         const drawBk = (lbl, val) => {
-            doc.fontSize(6.5).font('Helvetica');
+            doc.fontSize(7.5).font('Helvetica');
             setColor(doc, TEXT_MUTED);
-            doc.text(lbl, leftMargin + 8, bkY, { width: 60 });
+            doc.text(lbl, leftMargin + 8, bkY, { width: 70 });
             doc.font('Helvetica-Bold');
             setColor(doc, TEXT_MAIN);
-            doc.text(val || '—', leftMargin + 70, bkY, { width: b1W - 78 });
-            bkY += 9;
+            doc.text(val || '—', leftMargin + 80, bkY, { width: b1W - 88 });
+            bkY += 10;
         };
         drawBk('Bank Name:', bank.bank_name || 'Bank');
         drawBk('A/C No.:', bank.account_number || '—');
@@ -602,19 +681,19 @@ const generateInvoicePDF = (invoice, shop) => {
 
         // Card 2: QR Code
         const b2X = leftMargin + b1W + 8;
-        doc.roundedRect(b2X, curY, b2W, bH, 6);
+        doc.roundedRect(b2X, curY, b2W, bH, 5);
         setColor(doc, BG_CARD);
         doc.fill();
         setStroke(doc, BORDER);
-        doc.roundedRect(b2X, curY, b2W, bH, 6).lineWidth(0.5).stroke();
+        doc.roundedRect(b2X, curY, b2W, bH, 5).lineWidth(0.5).stroke();
 
-        doc.fontSize(7).font('Helvetica-Bold');
+        doc.fontSize(8).font('Helvetica-Bold');
         setColor(doc, NAVY);
         doc.text(country === 'IN' ? 'UPI PAYMENT' : 'SCAN TO PAY', b2X + 8, curY + 6, { width: b2W - 16, align: 'center' });
 
         if (qrBmp) {
             try {
-                doc.image(qrBmp, b2X + (b2W - 40) / 2, curY + 16, { width: 40, height: 40 });
+                doc.image(qrBmp, b2X + (b2W - 38) / 2, curY + 16, { width: 38, height: 38 });
             } catch (e) {
                 // Fallback text if QR buffer cannot be rendered
             }
@@ -622,71 +701,77 @@ const generateInvoicePDF = (invoice, shop) => {
 
         // Card 3: Contact / Tax Info
         const b3X = b2X + b2W + 8;
-        doc.roundedRect(b3X, curY, b3W, bH, 6);
+        doc.roundedRect(b3X, curY, b3W, bH, 5);
         setColor(doc, BG_CARD);
         doc.fill();
         setStroke(doc, BORDER);
-        doc.roundedRect(b3X, curY, b3W, bH, 6).lineWidth(0.5).stroke();
+        doc.roundedRect(b3X, curY, b3W, bH, 5).lineWidth(0.5).stroke();
 
-        doc.fontSize(7).font('Helvetica-Bold');
+        doc.fontSize(8).font('Helvetica-Bold');
         setColor(doc, NAVY);
         doc.text(country === 'KW' ? 'TAX / REGISTRATION' : 'FOR ANY QUERIES', b3X + 8, curY + 6);
-        doc.fontSize(7).font('Helvetica');
+        doc.fontSize(8).font('Helvetica');
         setColor(doc, TEXT_MUTED);
         let qY = curY + 18;
-        if (sellerPhone) { doc.text(`Phone: ${sellerPhone}`, b3X + 8, qY); qY += 9; }
-        if (sellerEmail) { doc.text(`Email: ${sellerEmail}`, b3X + 8, qY); qY += 9; }
+        if (sellerPhone) { doc.text(`Phone: ${sellerPhone}`, b3X + 8, qY); qY += 10; }
+        if (sellerEmail) { doc.text(`Email: ${sellerEmail}`, b3X + 8, qY); qY += 10; }
         doc.text('Scan QR or pay online for faster verification.', b3X + 8, qY, { width: b3W - 16 });
 
-        curY += bH + 10;
+        curY += bH + 8;
 
         // ═════════════════════════════════════════════════════════════════════
-        // 6. DECLARATION & SIGNATURES
+        // 7. DECLARATION & SIGNATURES
         // ═════════════════════════════════════════════════════════════════════
         const halfSigW = (pageWidth - 20) / 2;
-        doc.fontSize(7).font('Helvetica-Bold');
+        doc.fontSize(8).font('Helvetica-Bold');
         setColor(doc, TEXT_MUTED);
         doc.text('DECLARATION', leftMargin, curY);
-        doc.fontSize(6.5).font('Helvetica');
+        doc.fontSize(7.5).font('Helvetica');
         setColor(doc, TEXT_MUTED);
         doc.text(
             invoice.declaration || shop?.invoice_declaration || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
             leftMargin,
-            curY + 9,
+            curY + 10,
             { width: halfSigW }
         );
 
         // Signatures
-        const sigLineY = curY + 38;
+        const sigLineY = curY + 40;
         setStroke(doc, BORDER);
-        doc.moveTo(leftMargin, sigLineY).lineTo(leftMargin + 120, sigLineY).lineWidth(0.5).stroke();
-        doc.fontSize(6.5).font('Helvetica-Bold');
+        doc.moveTo(leftMargin, sigLineY).lineTo(leftMargin + 130, sigLineY).lineWidth(0.5).stroke();
+        doc.fontSize(7.5).font('Helvetica-Bold');
         setColor(doc, TEXT_MUTED);
         doc.text("Customer's Signature", leftMargin, sigLineY + 3);
 
         const rSigX = leftMargin + pageWidth - 140;
         doc.moveTo(rSigX, sigLineY).lineTo(leftMargin + pageWidth, sigLineY).lineWidth(0.5).stroke();
-        doc.text(`For ${sellerName}`, rSigX, sigLineY - 9, { width: 140, align: 'right' });
+        doc.text(`For ${sellerName}`, rSigX, sigLineY - 10, { width: 140, align: 'right' });
         doc.text('Authorised Signatory', rSigX, sigLineY + 3, { width: 140, align: 'right' });
 
         // ═════════════════════════════════════════════════════════════════════
-        // 7. FOOTER BAR
+        // 8. PROFESSIONAL FOOTER (HAIRLINE DIVIDER, NO THICK BAR, NO 2ND PAGE)
         // ═════════════════════════════════════════════════════════════════════
-        const footerY = doc.page.height - 35;
-        doc.rect(leftMargin, footerY, pageWidth, 16);
-        setColor(doc, NAVY);
-        doc.fill();
+        const footerY = doc.page.height - 42;
+        setStroke(doc, BORDER);
+        doc.moveTo(leftMargin, footerY).lineTo(leftMargin + pageWidth, footerY).lineWidth(0.5).stroke();
 
-        doc.fontSize(7).font('Helvetica-Bold');
-        setColor(doc, '#ffffff');
-        doc.text('Thank you for your business!  |  Powered by Hisabi POS  |  www.hisabi.com', leftMargin, footerY + 4, {
-            width: pageWidth,
-            align: 'center'
-        });
+        doc.fontSize(8).font('Helvetica');
+        setColor(doc, TEXT_MUTED);
+        doc.text(
+            'Thank you for your business!  |  Powered by Hisabi POS  |  Modern POS & Inventory for Growing Businesses',
+            leftMargin,
+            footerY + 5,
+            {
+                width: pageWidth,
+                align: 'center',
+                lineBreak: false
+            }
+        );
 
         doc.end();
     });
 };
+
 
 // ─── Due Payment Receipt PDF ─────────────────────────────────────────────────
 

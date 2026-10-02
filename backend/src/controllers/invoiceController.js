@@ -4,8 +4,24 @@ const { sequelize } = require('../../../database/database');
 const { Shop, Product, Invoice, InvoiceItem, InvoiceRevision, BundleItem, Customer, StockAdjustment } = require('../../../database/models');
 
 const { calculateInvoice } = require('../utils/invoiceCalculationEngine');
-const { generateGCC_TLV_Base64 } = require('../utils/tlvUtils');
-const { getCountryConfig } = require('../config/countryConfig');
+const { getCountryConfig, resolveIndianState } = require('../config/countryConfig');
+
+// ─── Inline ZATCA-compliant GCC/UAE TLV Base64 Encoder ──────────────────────
+function generateGCC_TLV_Base64({ sellerName, vatNumber, timestamp, invoiceTotal, vatTotal }) {
+    function encodeTLV(tag, value) {
+        const valueBytes = Buffer.from(value, 'utf8');
+        return Buffer.concat([Buffer.from([tag]), Buffer.from([valueBytes.length]), valueBytes]);
+    }
+    const dt = timestamp instanceof Date ? timestamp.toISOString() : new Date().toISOString();
+    const tlvBuffer = Buffer.concat([
+        encodeTLV(1, String(sellerName || '')),
+        encodeTLV(2, String(vatNumber || '')),
+        encodeTLV(3, dt),
+        encodeTLV(4, parseFloat(invoiceTotal || 0).toFixed(2)),
+        encodeTLV(5, parseFloat(vatTotal || 0).toFixed(2))
+    ]);
+    return tlvBuffer.toString('base64');
+}
 
 const invoiceSchema = Joi.object({
     idempotency_key: Joi.string().allow('', null),
@@ -20,6 +36,7 @@ const invoiceSchema = Joi.object({
     place_of_supply_code: Joi.string().allow('', null),
     reverse_charge: Joi.boolean().default(false),
     payment_method: Joi.string().allow('', null).default('cash'),
+    finance_company: Joi.string().allow('', null),
     notes: Joi.string().allow('', null),
     declaration: Joi.string().allow('', null),
     discount: Joi.number().min(0).default(0),
@@ -62,6 +79,7 @@ const createInvoice = async (req, res) => {
             place_of_supply_code,
             reverse_charge,
             payment_method,
+            finance_company,
             notes,
             declaration,
             discount,
@@ -286,10 +304,11 @@ const createInvoice = async (req, res) => {
             customer_address: customer_address ? customer_address.trim() : (customerRecord ? customerRecord.address : null),
             customer_id: customerRecord ? customerRecord.id : null,
             buyer_tax_id: buyer_tax_id ? buyer_tax_id.trim() : null,
-            place_of_supply_state: place_of_supply_state || null,
-            place_of_supply_code: place_of_supply_code || null,
+            place_of_supply_state: (place_of_supply_state || place_of_supply_code) ? resolveIndianState(place_of_supply_state, place_of_supply_code).state : null,
+            place_of_supply_code: (place_of_supply_state || place_of_supply_code) ? resolveIndianState(place_of_supply_state, place_of_supply_code).code : null,
             reverse_charge: meta.is_reverse_charge,
             payment_method: payment_method || 'cash',
+            finance_company: finance_company ? finance_company.trim() : null,
             notes: notes || shop.invoice_notes || null,
             declaration: declaration || shop.invoice_declaration || null,
             seller_name_snapshot: shop.name,
@@ -298,6 +317,7 @@ const createInvoice = async (req, res) => {
             seller_email_snapshot: shop.email,
             seller_tax_id_snapshot: shop.trn || shop.gstin || shop.cr_number,
             seller_cr_number_snapshot: shop.cr_number || null,
+            seller_logo_snapshot: shop.brand_logo || null,
             bank_details_snapshot: (shop.bank_name || shop.bank_account_number) ? {
                 bank_name: shop.bank_name || '',
                 account_number: shop.bank_account_number || '',
@@ -542,9 +562,9 @@ const updateInvoice = async (req, res) => {
             customer_phone: customer_phone || invoice.customer_phone,
             customer_email: customer_email || invoice.customer_email,
             customer_address: customer_address || invoice.customer_address,
-            buyer_tax_id: buyer_tax_id || invoice.buyer_tax_id,
-            place_of_supply_state: place_of_supply_state || invoice.place_of_supply_state,
-            place_of_supply_code: place_of_supply_code || invoice.place_of_supply_code,
+            buyer_tax_id: buyer_tax_id !== undefined ? buyer_tax_id : invoice.buyer_tax_id,
+            place_of_supply_state: (place_of_supply_state !== undefined ? place_of_supply_state : invoice.place_of_supply_state) || null,
+            place_of_supply_code: (place_of_supply_code !== undefined ? place_of_supply_code : (place_of_supply_state ? resolveIndianState(place_of_supply_state).code : invoice.place_of_supply_code)) || null,
             reverse_charge: meta.is_reverse_charge,
             payment_method: payment_method || invoice.payment_method,
             notes: notes || invoice.notes,

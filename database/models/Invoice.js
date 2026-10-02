@@ -182,6 +182,14 @@ const Invoice = sequelize.define('Invoice', {
     bank_details_snapshot: {
         type: DataTypes.JSONB,
         allowNull: true
+    },
+    finance_company: {
+        type: DataTypes.STRING(150),
+        allowNull: true  // Finance company name for loan/EMI purchases
+    },
+    seller_logo_snapshot: {
+        type: DataTypes.TEXT,
+        allowNull: true  // Base64 or URL of shop logo at time of invoice creation
     }
 }, {
     tableName: 'invoices',

@@ -94,8 +94,22 @@ const POS = () => {
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerEmail, setCustomerEmail] = useState('');
     const [customerAddress, setCustomerAddress] = useState('');
+    const [placeOfSupplyState, setPlaceOfSupplyState] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('cash');
+    const [financeCompany, setFinanceCompany] = useState('');
     const [paidAmount, setPaidAmount] = useState(0);
+
+    const isIndiaShop = currency === 'INR' || user?.shop?.country === 'IN';
+
+    const INDIA_STATES = [
+        'Andaman and Nicobar Islands','Andhra Pradesh','Arunachal Pradesh','Assam','Bihar',
+        'Chandigarh','Chhattisgarh','Dadra and Nagar Haveli and Daman and Diu','Delhi',
+        'Goa','Gujarat','Haryana','Himachal Pradesh','Jammu and Kashmir','Jharkhand',
+        'Karnataka','Kerala','Ladakh','Lakshadweep','Madhya Pradesh','Maharashtra',
+        'Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Puducherry','Punjab',
+        'Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh',
+        'Uttarakhand','West Bengal'
+    ];
 
     // Auto-fill returning customer details when entering phone or email
     useEffect(() => {
@@ -290,7 +304,10 @@ const POS = () => {
             discount: totalDiscount,
             paid_amount: paidAmount || grandTotal,
             payment_method: paymentMethod,
-            discount_code: appliedDiscountCode?.code?.code
+            finance_company: paymentMethod === 'finance' ? (financeCompany || null) : null,
+
+            discount_code: appliedDiscountCode?.code?.code,
+            ...(isIndiaShop && placeOfSupplyState ? { place_of_supply_state: placeOfSupplyState } : {})
         };
 
         if (!navigator.onLine) {
@@ -307,6 +324,7 @@ const POS = () => {
             setCustomerPhone('');
             setCustomerEmail('');
             setCustomerAddress('');
+            setPlaceOfSupplyState('');
             setDiscount(0);
             setPaidAmount(0);
             setAppliedDiscountCode(null);
@@ -322,6 +340,7 @@ const POS = () => {
             setCustomerPhone('');
             setCustomerEmail('');
             setCustomerAddress('');
+            setPlaceOfSupplyState('');
             setDiscount(0);
             setPaidAmount(0);
             setAppliedDiscountCode(null);
@@ -340,6 +359,7 @@ const POS = () => {
                 setCustomerPhone('');
                 setCustomerEmail('');
                 setCustomerAddress('');
+                setPlaceOfSupplyState('');
                 setDiscount(0);
                 setPaidAmount(0);
                 setAppliedDiscountCode(null);
@@ -533,6 +553,19 @@ const POS = () => {
                                 onChange={(e) => setCustomerAddress(e.target.value)}
                             />
                         </div>
+                        {isIndiaShop && (
+                            <div className="relative">
+                                <MapPin className={`absolute ${isRTL ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400`} />
+                                <select
+                                    className={`w-full ${isRTL ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-400 shadow-sm transition-all appearance-none`}
+                                    value={placeOfSupplyState}
+                                    onChange={(e) => setPlaceOfSupplyState(e.target.value)}
+                                >
+                                    <option value="">Place of Supply (State)</option>
+                                    {INDIA_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -701,11 +734,12 @@ const POS = () => {
 
                         {/* Payment & Final Action */}
                         <div className="space-y-2">
-                            <div className="grid grid-cols-3 gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/60 shadow-inner">
+                        <div className="grid grid-cols-4 gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/60 shadow-inner">
                                 {[
                                     { id: 'cash', icon: Wallet, label: t('pos.payment_methods.cash') },
                                     { id: 'card', icon: CreditCard, label: t('pos.payment_methods.card') },
-                                    { id: 'digital', icon: QrCode, label: t('pos.payment_methods.digital') }
+                                    { id: 'digital', icon: QrCode, label: t('pos.payment_methods.digital') },
+                                    { id: 'finance', icon: CreditCard, label: 'Finance' }
                                 ].map(method => (
                                     <button
                                         key={method.id}
@@ -717,6 +751,18 @@ const POS = () => {
                                     </button>
                                 ))}
                             </div>
+
+                            {paymentMethod === 'finance' && (
+                                <div className="animate-fade-in">
+                                    <input
+                                        type="text"
+                                        placeholder="Finance Company Name (e.g. Bajaj Finance)"
+                                        value={financeCompany}
+                                        onChange={e => setFinanceCompany(e.target.value)}
+                                        className="w-full px-3 py-2 bg-violet-50 border border-violet-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-violet-500 placeholder:font-normal placeholder:text-slate-400"
+                                    />
+                                </div>
+                            )}
 
                             <button
                                 onClick={handleCheckout}
@@ -849,6 +895,16 @@ const POS = () => {
                             value={customerAddress}
                             onChange={(e) => setCustomerAddress(e.target.value)}
                         />
+                        {isIndiaShop && (
+                            <select
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-400 transition-all appearance-none"
+                                value={placeOfSupplyState}
+                                onChange={(e) => setPlaceOfSupplyState(e.target.value)}
+                            >
+                                <option value="">Place of Supply (State)</option>
+                                {INDIA_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        )}
                     </div>
 
                     {/* Cart Items + Summary — scrollable */}

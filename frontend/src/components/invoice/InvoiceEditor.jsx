@@ -17,6 +17,7 @@ const InvoiceEditor = ({ initialInvoice = {}, shop = {}, onSave, onCancel }) => 
         date: initialInvoice.date || new Date().toISOString(),
         supply_date: initialInvoice.supply_date || '',
         payment_method: initialInvoice.payment_method || 'cash',
+        finance_company: initialInvoice.finance_company || '',
         reverse_charge: Boolean(initialInvoice.reverse_charge),
         customer_name: initialInvoice.customer_name || 'Walk-in Customer',
         customer_phone: initialInvoice.customer_phone || '',
@@ -355,6 +356,34 @@ const InvoiceEditor = ({ initialInvoice = {}, shop = {}, onSave, onCancel }) => 
                             <DollarSign className="w-4 h-4 text-blue-600" /> Invoice Discounts & Payments
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                            <div>
+                                <label className="font-bold text-slate-700 block mb-1">Payment Method</label>
+                                <select
+                                    value={invoiceData.payment_method}
+                                    onChange={e => setInvoiceData(prev => ({ ...prev, payment_method: e.target.value }))}
+                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 outline-none focus:border-blue-500"
+                                >
+                                    <option value="cash">Cash</option>
+                                    <option value="card">Card</option>
+                                    <option value="digital">Digital / UPI</option>
+                                    <option value="finance">Finance / EMI / Loan</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="cheque">Cheque</option>
+                                    <option value="knet">KNET</option>
+                                </select>
+                            </div>
+                            {invoiceData.payment_method === 'finance' && (
+                                <div>
+                                    <label className="font-bold text-slate-700 block mb-1">Finance Company Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Bajaj Finance, Emirates NBD Finance"
+                                        value={invoiceData.finance_company}
+                                        onChange={e => setInvoiceData(prev => ({ ...prev, finance_company: e.target.value }))}
+                                        className="w-full px-3 py-2 bg-violet-50 border border-violet-200 rounded-xl font-bold text-slate-900 outline-none focus:border-violet-500"
+                                    />
+                                </div>
+                            )}
                             <div>
                                 <label className="font-bold text-slate-700 block mb-1">Invoice-Level Discount</label>
                                 <input

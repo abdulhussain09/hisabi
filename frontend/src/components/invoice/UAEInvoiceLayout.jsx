@@ -17,11 +17,13 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
         ? new Date(invoice.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
         : new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-    const sellerName = invoice.seller_name_snapshot || shop?.name || 'Hisabi Technologies';
+    const sellerName = invoice.seller_name_snapshot || shop?.name || 'Store';
     const sellerAddress = invoice.seller_address_snapshot || shop?.address || 'Dubai, UAE';
-    const sellerPhone = invoice.seller_phone_snapshot || shop?.phone || '+971 50 123 4567';
-    const sellerEmail = invoice.seller_email_snapshot || shop?.email || 'info@hisabi.com';
+    const sellerPhone = invoice.seller_phone_snapshot || shop?.phone || '';
+    const sellerEmail = invoice.seller_email_snapshot || shop?.email || '';
+    const sellerLogo = invoice.seller_logo_snapshot || shop?.brand_logo || null;
     const trn = invoice.seller_tax_id_snapshot || shop?.trn || '100000000000003';
+    const financeCompany = invoice.finance_company || null;
 
     const customerName = invoice.customer_name || 'Walk-in Customer';
     const customerPhone = invoice.customer_phone || '';
@@ -46,37 +48,39 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
         <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white p-8 box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:p-6 print:w-full print:max-w-none text-[11px] leading-tight">
             {/* ═══════ HEADER ═══════ */}
             <div className="flex justify-between items-center pb-5 border-b border-slate-200">
-                {/* Left: Brand */}
-                <div className="max-w-[35%]">
-                    <div className="flex items-center gap-2 mb-1">
-                        <div className="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center text-white font-black text-lg shadow-sm">
-                            H
-                        </div>
+                {/* Left: User Shop Logo & Details */}
+                <div className="max-w-[40%]">
+                    <div className="flex items-center gap-2.5 mb-2">
+                        {sellerLogo ? (
+                            <img src={sellerLogo} alt={sellerName} className="w-11 h-11 rounded-lg object-contain border border-slate-200 shadow-2xs" />
+                        ) : (
+                            <div className="w-11 h-11 rounded-lg bg-[#024282] flex items-center justify-center text-white font-black text-xl shadow-xs">
+                                {sellerName.charAt(0).toUpperCase()}
+                            </div>
+                        )}
                         <div>
-                            <span className="text-2xl font-black tracking-tight text-slate-900">Hisabi</span>
+                            <span className="text-xl font-black tracking-tight text-slate-900 leading-tight block">{sellerName}</span>
                         </div>
                     </div>
-                    <p className="text-[9px] font-black text-slate-700 uppercase tracking-wider">SMART POS & INVENTORY SOLUTIONS</p>
-                    <p className="text-[9px] text-slate-400 font-medium">Simple • Fast • Reliable</p>
-                </div>
-
-                {/* Center: Contact Info */}
-                <div className="text-left text-slate-600 space-y-0.5 text-[10px]">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                        <MapPin className="w-3 h-3 text-sky-500" />
-                        <span>{sellerAddress}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <Phone className="w-3 h-3 text-slate-400" />
-                        <span>{sellerPhone}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <Mail className="w-3 h-3 text-slate-400" />
-                        <span>{sellerEmail}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                        <Globe className="w-3 h-3 text-slate-400" />
-                        <span>www.hisabi.com</span>
+                    <div className="text-slate-600 space-y-0.5 text-[10px]">
+                        {sellerAddress && (
+                            <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                                <MapPin className="w-3 h-3 text-sky-500" />
+                                <span>{sellerAddress}</span>
+                            </div>
+                        )}
+                        {sellerPhone && (
+                            <div className="flex items-center gap-1.5">
+                                <Phone className="w-3 h-3 text-slate-400" />
+                                <span>{sellerPhone}</span>
+                            </div>
+                        )}
+                        {sellerEmail && (
+                            <div className="flex items-center gap-1.5">
+                                <Mail className="w-3 h-3 text-slate-400" />
+                                <span>{sellerEmail}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -98,19 +102,24 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
                     </p>
                 </div>
 
-                {/* 3 Equal Metadata Cards */}
+                {/* Metadata Cards */}
                 <div className="flex gap-2">
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-center min-w-[90px]">
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-center min-w-[85px]">
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Invoice No.</span>
                         <span className="font-black text-xs text-slate-900 font-mono">INV-{String(invoice.invoice_number || '1').padStart(6, '0')}</span>
                     </div>
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-center min-w-[90px]">
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-center min-w-[85px]">
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Issue Date</span>
                         <span className="font-bold text-xs text-slate-900">{dateStr}</span>
                     </div>
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-center min-w-[90px]">
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-center min-w-[85px]">
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Supply Date</span>
                         <span className="font-bold text-xs text-slate-900">{invoice.supply_date ? new Date(invoice.supply_date).toLocaleDateString('en-GB') : dateStr}</span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-center min-w-[85px]">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Payment</span>
+                        <span className="font-bold text-xs text-slate-900">{paymentMethod}</span>
+                        {financeCompany && <span className="text-[8px] font-bold text-violet-700 block truncate">{financeCompany}</span>}
                     </div>
                 </div>
             </div>
@@ -227,32 +236,36 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
                         })}
                     </tbody>
                 </table>
-            </div>
 
-            {/* ═══════ TOTALS & AMOUNT IN WORDS ═══════ */}
-            <div className="grid grid-cols-12 gap-4 mb-4">
-                <div className="col-span-7 bg-slate-50/80 border border-slate-200 rounded-xl p-3 flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center flex-shrink-0">
-                        <FileText className="w-4 h-4" />
+                {/* ── Connected Totals & Amount in Words Bar ── */}
+                <div className="border-t border-slate-200 grid grid-cols-12 bg-slate-50/80">
+                    {/* Amount in Words (left 7 cols) */}
+                    <div className="col-span-7 p-3 border-r border-slate-200 flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Amount in Words / المبلغ كتابة</span>
+                            <p className="font-black text-xs text-slate-900">{totals.amount_in_words}</p>
+                        </div>
                     </div>
-                    <div>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Amount in Words</span>
-                        <p className="font-black text-xs text-slate-900">{totals.amount_in_words}</p>
-                    </div>
-                </div>
 
-                <div className="col-span-5 bg-slate-50/80 border border-slate-200 rounded-xl p-3 text-[11px] space-y-1.5">
-                    <div className="flex justify-between text-slate-600 font-medium">
-                        <span>Subtotal ({currency})</span>
-                        <span className="font-bold text-slate-900">{parseFloat(totals.gross_subtotal).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-600 font-medium">
-                        <span>VAT Total ({currency})</span>
-                        <span className="font-bold text-slate-900">{parseFloat(totals.tax_total).toFixed(2)}</span>
-                    </div>
-                    <div className="mt-1 bg-[#024282] text-white rounded-lg p-2.5 flex justify-between items-center shadow-xs">
-                        <span className="font-black uppercase tracking-wider text-xs">Grand Total ({currency})</span>
-                        <span className="font-black text-sm">{parseFloat(totals.grand_total).toFixed(2)}</span>
+                    {/* Totals block (right 5 cols) */}
+                    <div className="col-span-5 flex flex-col justify-between text-[11px]">
+                        <div className="p-3 space-y-1 text-slate-600 font-medium border-b border-slate-200">
+                            <div className="flex justify-between">
+                                <span>Subtotal ({currency})</span>
+                                <span className="font-bold text-slate-900">{parseFloat(totals.gross_subtotal).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>VAT Total ({currency})</span>
+                                <span className="font-bold text-slate-900">{parseFloat(totals.tax_total).toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <div className="bg-[#024282] text-white p-2.5 flex justify-between items-center shadow-xs">
+                            <span className="font-black uppercase tracking-wider text-xs">Grand Total ({currency})</span>
+                            <span className="font-black text-sm">{parseFloat(totals.grand_total).toFixed(2)}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -336,15 +349,15 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
                     <p className="text-slate-600 leading-relaxed text-[9.5px]">
                         {invoiceDeclaration}
                     </p>
-                    <div className="pt-6">
-                        <div className="w-44 border-b border-slate-300"></div>
+                    <div className="pt-16">
+                        <div className="w-48 border-b border-slate-300"></div>
                         <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Customer's Seal & Signature</p>
                     </div>
                 </div>
 
                 <div className="flex flex-col justify-between items-end text-right">
                     <p className="font-black text-slate-900 uppercase">For {sellerName}</p>
-                    <div className="w-44 text-center pt-8">
+                    <div className="w-48 text-center pt-16">
                         <div className="border-b border-slate-300 mb-1"></div>
                         <p className="text-[9px] font-bold text-slate-500 uppercase">Authorised Signatory</p>
                     </div>

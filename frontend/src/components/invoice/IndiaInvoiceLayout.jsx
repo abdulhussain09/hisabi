@@ -4,6 +4,7 @@ import {
     ShieldCheck, Phone, Mail, QrCode
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyUtils';
+import { resolveIndianState } from '../../config/countryConfig';
 
 const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
     const { items, totals, meta } = calculation;
@@ -17,19 +18,22 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
         ? new Date(invoice.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
         : new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-    const sellerName = invoice.seller_name_snapshot || shop?.name || 'Hisabi Store';
-    const sellerAddress = invoice.seller_address_snapshot || shop?.address || 'India';
+    const sellerName = invoice.seller_name_snapshot || shop?.name || 'Store';
+    const sellerAddress = invoice.seller_address_snapshot || shop?.address || '';
     const sellerPhone = invoice.seller_phone_snapshot || shop?.phone || '';
     const sellerEmail = invoice.seller_email_snapshot || shop?.email || '';
+    const sellerLogo = invoice.seller_logo_snapshot || shop?.brand_logo || null;
     const gstin = invoice.seller_tax_id_snapshot || shop?.gstin || '[XXXXXXXXXXXX]';
+    const financeCompany = invoice.finance_company || null;
 
     const customerName = invoice.customer_name || 'Walk-in Customer';
     const customerPhone = invoice.customer_phone || '';
     const customerEmail = invoice.customer_email || '';
     const customerAddress = invoice.customer_address || '';
 
-    const placeState = invoice.place_of_supply_state || 'Rajasthan';
-    const placeCode = invoice.place_of_supply_code || '08';
+    const resolvedPlace = resolveIndianState(invoice.place_of_supply_state, invoice.place_of_supply_code);
+    const placeState = resolvedPlace.state || '—';
+    const placeCode = resolvedPlace.code || '—';
     const paymentMethod = (invoice.payment_method || 'CASH').toUpperCase();
 
     const bank = invoice.bank_details_snapshot || (shop?.bank_name ? {
@@ -45,25 +49,27 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
     const isPaid = (totals.due_amount || 0) <= 0;
 
     return (
-        <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white p-8 box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:p-6 print:w-full print:max-w-none text-[11px] leading-tight">
+        <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white p-7 box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:p-6 print:w-full print:max-w-none text-[10.5px] leading-snug">
             {/* ═══════ HEADER ═══════ */}
             <div className="flex justify-between items-start pb-5 border-b border-slate-200">
-                {/* Left: Brand & Shop Info */}
+                {/* Left: User's Shop Logo & Details */}
                 <div className="max-w-[45%]">
-                    <div className="flex items-center gap-2 mb-1.5">
-                        <div className="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center text-white font-black text-lg shadow-sm">
-                            H
-                        </div>
+                    <div className="flex items-center gap-2.5 mb-2">
+                        {sellerLogo ? (
+                            <img src={sellerLogo} alt={sellerName} className="w-10 h-10 rounded-lg object-contain border border-slate-200 shadow-2xs" />
+                        ) : (
+                            <div className="w-10 h-10 rounded-lg bg-[#024282] flex items-center justify-center text-white font-black text-xl shadow-xs">
+                                {sellerName.charAt(0).toUpperCase()}
+                            </div>
+                        )}
                         <div>
-                            <span className="text-xl font-black tracking-tight text-slate-900">Hisabi</span>
-                            <p className="text-[9px] text-slate-500 font-medium -mt-0.5">Smart Billing | Inventory | Business Growth</p>
+                            <span className="text-lg font-black tracking-tight text-slate-900 leading-tight block">{sellerName}</span>
                         </div>
                     </div>
-                    <div className="mt-2 text-slate-700 space-y-0.5">
-                        <p className="font-bold text-xs text-slate-900">{sellerName}</p>
-                        <p className="text-slate-500">{sellerAddress}</p>
+                    <div className="text-slate-600 text-[10px] space-y-0.5 leading-snug">
+                        {sellerAddress && <p>{sellerAddress}</p>}
                         {sellerPhone && <p className="text-slate-500">Ph: {sellerPhone}</p>}
-                        {sellerEmail && <p className="text-slate-500">Em: {sellerEmail}</p>}
+                        {sellerEmail && <p className="text-slate-500">Email: {sellerEmail}</p>}
                     </div>
                 </div>
 
@@ -81,28 +87,34 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                     <div className="mt-3 text-[11px] space-y-1 font-medium text-slate-700">
                         <div className="flex justify-end gap-2">
                             <span className="text-slate-400">Invoice No.</span>
-                            <span className="font-bold text-slate-900 w-24 text-left">: #{String(invoice.invoice_number || '1').padStart(4, '0')}</span>
+                            <span className="font-bold text-slate-900 w-28 text-left">: #{String(invoice.invoice_number || '1').padStart(4, '0')}</span>
                         </div>
                         <div className="flex justify-end gap-2">
                             <span className="text-slate-400">Date</span>
-                            <span className="font-bold text-slate-900 w-24 text-left">: {dateStr}</span>
+                            <span className="font-bold text-slate-900 w-28 text-left">: {dateStr}</span>
                         </div>
                         <div className="flex justify-end gap-2">
                             <span className="text-slate-400">Time</span>
-                            <span className="font-bold text-slate-900 w-24 text-left">: {timeStr}</span>
+                            <span className="font-bold text-slate-900 w-28 text-left">: {timeStr}</span>
                         </div>
                         <div className="flex justify-end gap-2">
                             <span className="text-slate-400">Payment Method</span>
-                            <span className="font-bold text-slate-900 w-24 text-left">: {paymentMethod}</span>
+                            <span className="font-bold text-slate-900 w-28 text-left">: {paymentMethod}</span>
                         </div>
+                        {financeCompany && (
+                            <div className="flex justify-end gap-2">
+                                <span className="text-slate-400">Finance Co.</span>
+                                <span className="font-bold text-slate-900 w-28 text-left">: {financeCompany}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* ═══════ 3 CARDS ROW (BILL TO, PLACE OF SUPPLY, PAYMENT METHOD) ═══════ */}
+            {/* ═══════ 2 CARDS ROW (BILL TO & SHIP / SUPPLY TO) ═══════ */}
             <div className="grid grid-cols-12 gap-3 my-4">
                 {/* Bill To */}
-                <div className="col-span-6 bg-slate-50/90 border border-slate-200/90 rounded-xl p-3">
+                <div className="col-span-7 bg-slate-50/90 border border-slate-200/90 rounded-xl p-3">
                     <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
                         <User className="w-3.5 h-3.5" />
                         <span>BILL TO</span>
@@ -115,127 +127,127 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                     </div>
                 </div>
 
-                {/* Place of Supply */}
-                <div className="col-span-3 bg-slate-50/90 border border-slate-200/90 rounded-xl p-3">
+                {/* Place of Supply / Shipping Address */}
+                <div className="col-span-5 bg-slate-50/90 border border-slate-200/90 rounded-xl p-3">
                     <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
                         <MapPin className="w-3.5 h-3.5" />
-                        <span>Place of Supply</span>
+                        <span>SHIP / SUPPLY TO</span>
                     </div>
-                    <div className="mt-2 space-y-1 text-[10px]">
-                        <p><span className="text-slate-400">State :</span> <span className="font-bold text-slate-800">{placeState}</span></p>
-                        <p><span className="text-slate-400">State Code :</span> <span className="font-bold text-slate-800">{placeCode}</span></p>
-                    </div>
-                </div>
-
-                {/* Payment Method */}
-                <div className="col-span-3 bg-slate-50/90 border border-slate-200/90 rounded-xl p-3">
-                    <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
-                        <CreditCard className="w-3.5 h-3.5" />
-                        <span>Payment Method</span>
-                    </div>
-                    <div className="mt-3">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 rounded-lg font-black text-xs text-slate-800 shadow-2xs">
-                            {paymentMethod}
-                        </span>
+                    <div className="space-y-1 text-[10px] text-slate-700">
+                        {customerAddress ? (
+                            <>
+                                <p className="font-bold text-slate-900">{customerName}</p>
+                                <p className="text-slate-600 leading-snug">{customerAddress}</p>
+                            </>
+                        ) : (
+                            <p className="text-slate-400 italic">Same as billing address</p>
+                        )}
+                        <div className="pt-1.5 mt-1 border-t border-slate-200/60 flex items-center gap-3">
+                            <p><span className="text-slate-400">State:</span> <span className="font-bold text-slate-800">{placeState}</span></p>
+                            <p><span className="text-slate-400">Code:</span> <span className="font-bold text-slate-800">{placeCode}</span></p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* ═══════ ITEMS TABLE ═══════ */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden mb-4 shadow-2xs">
-                <table className="w-full border-collapse text-[10px]">
-                    <thead className="bg-[#024282] text-white font-bold text-[9px] uppercase tracking-wider">
+            {/* ═══════ ITEMS TABLE + TOTALS (ONE UNIFIED BLOCK) ═══════ */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden mb-3 shadow-2xs">
+                <table className="w-full border-collapse text-[9.5px]">
+                    <thead className="bg-[#024282] text-white font-bold text-[8.5px] uppercase tracking-wider">
                         <tr>
-                            <th className="py-2 px-2 text-center w-8 border-r border-[#1a5b9e]">S.No.</th>
-                            <th className="py-2 px-2 text-center w-16 border-r border-[#1a5b9e]">HSN/SAC</th>
-                            <th className="py-2 px-3 text-left border-r border-[#1a5b9e]">Description of Goods / Services</th>
-                            <th className="py-2 px-2 text-center w-16 border-r border-[#1a5b9e]">Qty / Unit</th>
-                            <th className="py-2 px-2 text-right w-14 border-r border-[#1a5b9e]">MRP (₹)</th>
-                            <th className="py-2 px-2 text-right w-14 border-r border-[#1a5b9e]">Rate (₹)</th>
-                            <th className="py-2 px-2 text-right w-14 border-r border-[#1a5b9e]">Discount (₹)</th>
-                            <th className="py-2 px-2 text-right w-16 border-r border-[#1a5b9e]">Taxable Value (₹)</th>
-                            <th className="py-2 px-2 text-center w-12 border-r border-[#1a5b9e]">GST Rate (%)</th>
-                            <th className="py-1 px-1 text-center w-28 border-r border-[#1a5b9e]" colSpan={2}>
-                                <div className="border-b border-[#1a5b9e] pb-0.5">Tax Amount (₹)</div>
-                                <div className="grid grid-cols-2 pt-0.5 text-[8px]">
+                            <th className="py-2 px-1.5 text-center w-7 border-r border-[#1a5b9e]">S.No.</th>
+                            <th className="py-2 px-1.5 text-center w-14 border-r border-[#1a5b9e]">HSN/SAC</th>
+                            <th className="py-2 px-2 text-left border-r border-[#1a5b9e]">Description of Goods / Services</th>
+                            <th className="py-2 px-1.5 text-center w-14 border-r border-[#1a5b9e]">Qty / Unit</th>
+                            <th className="py-2 px-1.5 text-right w-12 border-r border-[#1a5b9e]">MRP (₹)</th>
+                            <th className="py-2 px-1.5 text-right w-12 border-r border-[#1a5b9e]">Rate (₹)</th>
+                            <th className="py-2 px-1.5 text-right w-12 border-r border-[#1a5b9e]">Disc (₹)</th>
+                            <th className="py-2 px-1.5 text-right w-14 border-r border-[#1a5b9e]">Taxable (₹)</th>
+                            <th className="py-2 px-1.5 text-center w-10 border-r border-[#1a5b9e]">GST%</th>
+                            <th className="py-1 px-1 text-center w-24 border-r border-[#1a5b9e]" colSpan={2}>
+                                <div className="border-b border-[#1a5b9e] pb-0.5 text-[8px]">Tax Amount (₹)</div>
+                                <div className="grid grid-cols-2 pt-0.5 text-[7.5px]">
                                     <span>CGST</span>
                                     <span>SGST</span>
                                 </div>
                             </th>
-                            <th className="py-2 px-2 text-right w-16">Total (₹)</th>
+                            <th className="py-2 px-1.5 text-right w-14">Total (₹)</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-800">
                         {items.map((item, idx) => (
                             <tr key={idx} className={idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}>
-                                <td className="py-2 px-2 text-center font-bold text-slate-400 border-r border-slate-100">{idx + 1}</td>
-                                <td className="py-2 px-2 text-center font-mono text-slate-500 border-r border-slate-100">{item.hsn_sac || '—'}</td>
-                                <td className="py-2 px-3 border-r border-slate-100">
+                                <td className="py-1.5 px-1.5 text-center font-bold text-slate-400 border-r border-slate-100">{idx + 1}</td>
+                                <td className="py-1.5 px-1.5 text-center font-mono text-slate-500 border-r border-slate-100">{item.hsn_sac || '—'}</td>
+                                <td className="py-1.5 px-2 border-r border-slate-100">
                                     <p className="font-bold text-slate-900">{item.item_name}</p>
-                                    {item.item_description && <p className="text-[9px] text-slate-400 mt-0.5">{item.item_description}</p>}
+                                    {item.item_description && <p className="text-[8.5px] text-slate-400 mt-0.5">{item.item_description}</p>}
                                 </td>
-                                <td className="py-2 px-2 text-center font-medium border-r border-slate-100">{item.quantity} / {item.unit || 'Nos'}</td>
-                                <td className="py-2 px-2 text-right font-medium text-slate-500 border-r border-slate-100">{item.mrp ? parseFloat(item.mrp).toFixed(2) : '—'}</td>
-                                <td className="py-2 px-2 text-right font-medium border-r border-slate-100">{parseFloat(item.unit_price).toFixed(2)}</td>
-                                <td className="py-2 px-2 text-right font-medium text-slate-500 border-r border-slate-100">{parseFloat(item.discount || 0).toFixed(2)}</td>
-                                <td className="py-2 px-2 text-right font-bold text-slate-900 border-r border-slate-100">{parseFloat(item.taxable_amount).toFixed(2)}</td>
-                                <td className="py-2 px-2 text-center font-medium border-r border-slate-100">{item.tax_rate ? `${Math.round(item.tax_rate * 100)}%` : '—'}</td>
-                                <td className="py-2 px-1 text-right font-medium border-r border-slate-100 w-14">{item.cgst_amount > 0 ? parseFloat(item.cgst_amount).toFixed(2) : '—'}</td>
-                                <td className="py-2 px-1 text-right font-medium border-r border-slate-100 w-14">{item.sgst_amount > 0 ? parseFloat(item.sgst_amount).toFixed(2) : '—'}</td>
-                                <td className="py-2 px-2 text-right font-black text-slate-900">{parseFloat(item.line_total).toFixed(2)}</td>
+                                <td className="py-1.5 px-1.5 text-center font-medium border-r border-slate-100">{item.quantity} / {item.unit || 'Nos'}</td>
+                                <td className="py-1.5 px-1.5 text-right font-medium text-slate-500 border-r border-slate-100">{item.mrp ? parseFloat(item.mrp).toFixed(2) : '—'}</td>
+                                <td className="py-1.5 px-1.5 text-right font-medium border-r border-slate-100">{parseFloat(item.unit_price).toFixed(2)}</td>
+                                <td className="py-1.5 px-1.5 text-right font-medium text-slate-500 border-r border-slate-100">{parseFloat(item.discount || 0).toFixed(2)}</td>
+                                <td className="py-1.5 px-1.5 text-right font-bold text-slate-900 border-r border-slate-100">{parseFloat(item.taxable_amount).toFixed(2)}</td>
+                                <td className="py-1.5 px-1.5 text-center font-medium border-r border-slate-100">{item.tax_rate ? `${Math.round(item.tax_rate * 100)}%` : '—'}</td>
+                                <td className="py-1.5 px-1 text-right font-medium border-r border-slate-100 w-12">{item.cgst_amount > 0 ? parseFloat(item.cgst_amount).toFixed(2) : '—'}</td>
+                                <td className="py-1.5 px-1 text-right font-medium border-r border-slate-100 w-12">{item.sgst_amount > 0 ? parseFloat(item.sgst_amount).toFixed(2) : '—'}</td>
+                                <td className="py-1.5 px-1.5 text-right font-black text-slate-900">{parseFloat(item.line_total).toFixed(2)}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-            </div>
 
-            {/* ═══════ TAX SUMMARY & TOTALS ═══════ */}
-            <div className="grid grid-cols-12 gap-4 mb-4">
-                {/* GST Tax Summary Table */}
-                <div className="col-span-7 bg-slate-50/80 border border-slate-200 rounded-xl p-3">
-                    <p className="font-black text-[#024282] uppercase text-[10px] tracking-wider mb-2">GST TAX SUMMARY</p>
-                    <table className="w-full border-collapse text-[10px]">
-                        <thead>
-                            <tr className="border-b border-slate-200 text-slate-500 text-[9px] font-bold uppercase">
-                                <th className="py-1 px-1 text-left">Taxable Value (₹)</th>
-                                <th className="py-1 px-1 text-right">CGST (₹)</th>
-                                <th className="py-1 px-1 text-right">SGST (₹)</th>
-                                <th className="py-1 px-1 text-right">IGST (₹)</th>
-                                <th className="py-1 px-1 text-right">Total Tax (₹)</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 font-bold text-slate-800">
-                            <tr>
-                                <td className="py-1.5 px-1">{parseFloat(totals.taxable_total).toFixed(2)}</td>
-                                <td className="py-1.5 px-1 text-right">{parseFloat(totals.cgst_total).toFixed(2)}</td>
-                                <td className="py-1.5 px-1 text-right">{parseFloat(totals.sgst_total).toFixed(2)}</td>
-                                <td className="py-1.5 px-1 text-right">{parseFloat(totals.igst_total).toFixed(2)}</td>
-                                <td className="py-1.5 px-1 text-right text-[#024282] font-black">{parseFloat(totals.tax_total).toFixed(2)}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Totals Summary */}
-                <div className="col-span-5 bg-slate-50/80 border border-slate-200 rounded-xl p-3 flex flex-col justify-between text-[11px]">
-                    <div className="space-y-1.5 text-slate-600 font-medium">
-                        <div className="flex justify-between">
-                            <span>Subtotal</span>
-                            <span className="font-bold text-slate-900">₹ {parseFloat(totals.gross_subtotal).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Discount</span>
-                            <span className="font-bold text-slate-900">₹ {parseFloat(totals.global_discount).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>Round Off</span>
-                            <span className="font-bold text-slate-900">₹ {parseFloat(totals.round_off).toFixed(2)}</span>
-                        </div>
+                {/* ── GST Tax Summary + Totals attached directly below table ── */}
+                <div className="border-t border-slate-200 grid grid-cols-12">
+                    {/* GST Tax Summary (left 7 cols) */}
+                    <div className="col-span-7 bg-slate-50/80 p-2.5 border-r border-slate-200">
+                        <p className="font-black text-[#024282] uppercase text-[9px] tracking-wider mb-1.5">GST TAX SUMMARY</p>
+                        <table className="w-full border-collapse text-[9px]">
+                            <thead>
+                                <tr className="border-b border-slate-200 text-slate-500 text-[8px] font-bold uppercase">
+                                    <th className="py-0.5 px-1 text-left">Taxable (₹)</th>
+                                    <th className="py-0.5 px-1 text-right">CGST (₹)</th>
+                                    <th className="py-0.5 px-1 text-right">SGST (₹)</th>
+                                    <th className="py-0.5 px-1 text-right">IGST (₹)</th>
+                                    <th className="py-0.5 px-1 text-right">Total Tax (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody className="font-bold text-slate-800">
+                                <tr>
+                                    <td className="py-1 px-1">{parseFloat(totals.taxable_total).toFixed(2)}</td>
+                                    <td className="py-1 px-1 text-right">{parseFloat(totals.cgst_total).toFixed(2)}</td>
+                                    <td className="py-1 px-1 text-right">{parseFloat(totals.sgst_total).toFixed(2)}</td>
+                                    <td className="py-1 px-1 text-right">{parseFloat(totals.igst_total).toFixed(2)}</td>
+                                    <td className="py-1 px-1 text-right text-[#024282] font-black">{parseFloat(totals.tax_total).toFixed(2)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
-                    <div className="mt-2 bg-[#024282] text-white rounded-lg p-2.5 flex justify-between items-center shadow-xs">
-                        <span className="font-black uppercase tracking-wider text-xs">Grand Total</span>
-                        <span className="font-black text-sm">₹ {parseFloat(totals.grand_total).toFixed(2)}</span>
+                    {/* Totals block (right 5 cols) */}
+                    <div className="col-span-5 bg-slate-50/80 flex flex-col justify-between text-[10px]">
+                        <div className="p-2.5 space-y-1 text-slate-600 font-medium border-b border-slate-200">
+                            <div className="flex justify-between">
+                                <span>Subtotal</span>
+                                <span className="font-bold text-slate-900">₹ {parseFloat(totals.gross_subtotal).toFixed(2)}</span>
+                            </div>
+                            {parseFloat(totals.global_discount) > 0 && (
+                                <div className="flex justify-between">
+                                    <span>Discount</span>
+                                    <span className="font-bold text-red-600">− ₹ {parseFloat(totals.global_discount).toFixed(2)}</span>
+                                </div>
+                            )}
+                            {parseFloat(totals.round_off) !== 0 && (
+                                <div className="flex justify-between">
+                                    <span>Round Off</span>
+                                    <span className="font-bold text-slate-900">₹ {parseFloat(totals.round_off).toFixed(2)}</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="bg-[#024282] text-white p-2.5 flex justify-between items-center">
+                            <span className="font-black uppercase tracking-wider text-[10px]">Grand Total</span>
+                            <span className="font-black text-sm">₹ {parseFloat(totals.grand_total).toFixed(2)}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -315,15 +327,15 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                     <p className="text-slate-600 leading-relaxed">
                         {invoiceDeclaration}
                     </p>
-                    <div className="pt-6">
-                        <div className="w-44 border-b border-slate-300"></div>
+                    <div className="pt-16">
+                        <div className="w-48 border-b border-slate-300"></div>
                         <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Customer's Seal & Signature</p>
                     </div>
                 </div>
 
                 <div className="col-span-5 flex flex-col justify-between items-end text-right">
                     <p className="font-black text-slate-900 uppercase">For {sellerName}</p>
-                    <div className="w-44 text-center pt-8">
+                    <div className="w-48 text-center pt-16">
                         <div className="border-b border-slate-300 mb-1"></div>
                         <p className="text-[9px] font-bold text-slate-500 uppercase">Authorised Signatory</p>
                     </div>
@@ -331,9 +343,8 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
             </div>
 
             {/* ═══════ FOOTER ═══════ */}
-            <div className="mt-6 pt-3 border-t border-slate-100 text-center text-[9px] text-slate-400">
-                <p>Thank you for your business!</p>
-                <p className="font-bold text-slate-500 mt-0.5">Powered by Hisabi | Modern POS & Inventory for Growing Businesses</p>
+            <div className="mt-4 pt-2 border-t border-slate-100 text-center text-[8.5px] text-slate-400">
+                <p>Thank you for your business! &nbsp;|&nbsp; Powered by Hisabi POS &nbsp;|&nbsp; Modern POS &amp; Inventory for Growing Businesses</p>
             </div>
         </div>
     );
