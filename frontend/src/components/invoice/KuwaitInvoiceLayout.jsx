@@ -4,6 +4,7 @@ import {
     CheckCircle2, Building, ShieldCheck, Phone, Mail, Globe, MapPin
 } from 'lucide-react';
 import { KuwaitSkyline } from './KuwaitSkyline';
+import QRCodeImage from './QRCodeImage';
 
 const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
     const { items, totals, meta } = calculation;
@@ -140,41 +141,23 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
                 </div>
             </div>
 
-            {/* ═══════ 2 CARDS ROW (BILL TO, SUPPLY / DELIVERY DETAILS) ═══════ */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-                {/* Bill To */}
-                <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-3">
-                    <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
-                        <User className="w-3.5 h-3.5" />
-                        <span>Bill To / العميل</span>
-                    </div>
-                    <p className="font-black text-xs text-slate-900">{customerName}</p>
-                    <div className="mt-1 space-y-0.5 text-slate-600 text-[10px]">
-                        {customerPhone && <p className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-slate-400" /> {customerPhone}</p>}
-                        {customerEmail && <p className="flex items-center gap-1.5"><Mail className="w-3 h-3 text-slate-400" /> {customerEmail}</p>}
-                        {customerAddress && <p className="flex items-center gap-1.5"><MapPin className="w-3 h-3 text-slate-400" /> {customerAddress}</p>}
-                    </div>
+            {/* ═══════ BILL TO CARD (FULL WIDTH) ═══════ */}
+            <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-3 mb-4">
+                <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
+                    <User className="w-3.5 h-3.5" />
+                    <span>Bill To / العميل (Buyer Details)</span>
                 </div>
-
-                {/* Supply Details */}
-                <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-3">
-                    <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
-                        <Truck className="w-3.5 h-3.5" />
-                        <span>Supply / Delivery Details / تفاصيل التوريد والتسليم</span>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <p className="font-black text-xs text-slate-900">{customerName}</p>
+                        <div className="mt-1 space-y-0.5 text-slate-600 text-[10px]">
+                            {customerPhone && <p className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-slate-400" /> {customerPhone}</p>}
+                            {customerEmail && <p className="flex items-center gap-1.5"><Mail className="w-3 h-3 text-slate-400" /> {customerEmail}</p>}
+                        </div>
                     </div>
-                    <div className="space-y-1 text-[10px]">
-                        <div className="flex justify-between">
-                            <span className="text-slate-400">Supply Date / تاريخ التوريد</span>
-                            <span className="font-bold text-slate-800">{invoice.supply_date ? new Date(invoice.supply_date).toLocaleDateString('en-GB') : dateStr}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-slate-400">Delivery Address / عنوان التسليم</span>
-                            <span className="font-bold text-slate-800">{customerAddress || '—'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-slate-400">Sales Representative / مندوب المبيعات</span>
-                            <span className="font-bold text-slate-800">—</span>
-                        </div>
+                    <div className="text-slate-600 text-[10px] space-y-0.5 border-l border-slate-200/80 pl-4">
+                        {customerAddress && <p className="flex items-start gap-1.5"><MapPin className="w-3 h-3 text-slate-400 mt-0.5 shrink-0" /> <span>{customerAddress}</span></p>}
+                        {invoice.customer_civil_id && <p className="font-mono"><span className="text-slate-400">Civil ID:</span> <span className="font-bold text-slate-800">{invoice.customer_civil_id}</span></p>}
                     </div>
                 </div>
             </div>
@@ -284,9 +267,13 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
                 {/* Scan to Pay */}
                 <div className="col-span-3 bg-slate-50/80 border border-slate-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
                     <span className="font-black text-[#024282] uppercase text-[9px] tracking-wider mb-1">Scan to Pay / امسح للدفع</span>
-                    <div className="w-16 h-16 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs mb-1">
-                        <img src={qrUrl} alt="Scan to Pay QR" className="w-full h-full object-contain" />
-                    </div>
+                    <QRCodeImage
+                        text={qrData}
+                        alt="Scan to Pay QR"
+                        containerClassName="w-16 h-16 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs mb-1 flex items-center justify-center"
+                        unavailableText="QR Unavailable"
+                        unavailableSubtext="No Payment Link"
+                    />
                     <span className="text-[7.5px] text-slate-400">Pay securely with</span>
                     <div className="flex items-center gap-1 mt-0.5">
                         <span className="px-1 py-0.2 bg-blue-700 text-white rounded text-[7px] font-black">KNET</span>

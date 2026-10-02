@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/currencyUtils';
 import { resolveIndianState } from '../../config/countryConfig';
+import QRCodeImage from './QRCodeImage';
 
 const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
     const { items, totals, meta } = calculation;
@@ -31,9 +32,6 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
     const customerEmail = invoice.customer_email || '';
     const customerAddress = invoice.customer_address || '';
 
-    const resolvedPlace = resolveIndianState(invoice.place_of_supply_state, invoice.place_of_supply_code);
-    const placeState = resolvedPlace.state || '—';
-    const placeCode = resolvedPlace.code || '—';
     const paymentMethod = (invoice.payment_method || 'CASH').toUpperCase();
 
     const bank = invoice.bank_details_snapshot || (shop?.bank_name ? {
@@ -41,8 +39,13 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
         account_number: shop.bank_account_number,
         iban_ifsc: shop.bank_iban_ifsc
     } : {});
-    const qrData = invoice.qr_code_data || `upi://pay?pa=${shop?.upi_id || 'hisabi@upi'}&pn=${encodeURIComponent(sellerName)}&am=${totals.grand_total}&cu=INR`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrData)}`;
+
+    // Real Payment QR Payload: Only generated if shop has real upi_id or invoice has qr_code_data
+    const upiId = shop?.upi_id || invoice.upi_id || null;
+    const realQrData = invoice.qr_code_data || (upiId
+        ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(sellerName)}&am=${totals.grand_total}&cu=INR`
+        : null);
+
     const invoiceNotes = invoice.notes || shop?.invoice_notes || 'Thank you for your business! If you have any questions about this invoice, please contact us.';
     const invoiceDeclaration = invoice.declaration || shop?.invoice_declaration || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
 
@@ -111,41 +114,24 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                 </div>
             </div>
 
-            {/* ═══════ 2 CARDS ROW (BILL TO & SHIP / SUPPLY TO) ═══════ */}
-            <div className="grid grid-cols-12 gap-3 my-4">
-                {/* Bill To */}
-                <div className="col-span-7 bg-slate-50/90 border border-slate-200/90 rounded-xl p-3">
-                    <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
-                        <User className="w-3.5 h-3.5" />
-                        <span>BILL TO</span>
+            {/* ═══════ BILL TO CARD (FULL WIDTH) ═══════ */}
+            <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-3 my-3">
+                <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
+                    <User className="w-3.5 h-3.5" />
+                    <span>BILL TO</span>
+                </div>
+                <div className="grid grid-cols-12 gap-3 items-start">
+                    <div className="col-span-7 space-y-0.5">
+                        <p className="font-black text-xs text-slate-900">{customerName}</p>
+                        {customerAddress ? (
+                            <p className="text-slate-600 text-[10px] leading-snug">{customerAddress}</p>
+                        ) : (
+                            <p className="text-slate-400 text-[9.5px] italic">No address provided</p>
+                        )}
                     </div>
-                    <p className="font-black text-xs text-slate-900">{customerName}</p>
-                    <div className="mt-1 space-y-0.5 text-slate-600 text-[10px]">
+                    <div className="col-span-5 text-right space-y-0.5 text-slate-600 text-[10px]">
                         {customerPhone && <p><span className="text-slate-400">Phone :</span> {customerPhone}</p>}
                         {customerEmail && <p><span className="text-slate-400">Email :</span> {customerEmail}</p>}
-                        {customerAddress && <p><span className="text-slate-400">Address :</span> {customerAddress}</p>}
-                    </div>
-                </div>
-
-                {/* Place of Supply / Shipping Address */}
-                <div className="col-span-5 bg-slate-50/90 border border-slate-200/90 rounded-xl p-3">
-                    <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>SHIP / SUPPLY TO</span>
-                    </div>
-                    <div className="space-y-1 text-[10px] text-slate-700">
-                        {customerAddress ? (
-                            <>
-                                <p className="font-bold text-slate-900">{customerName}</p>
-                                <p className="text-slate-600 leading-snug">{customerAddress}</p>
-                            </>
-                        ) : (
-                            <p className="text-slate-400 italic">Same as billing address</p>
-                        )}
-                        <div className="pt-1.5 mt-1 border-t border-slate-200/60 flex items-center gap-3">
-                            <p><span className="text-slate-400">State:</span> <span className="font-bold text-slate-800">{placeState}</span></p>
-                            <p><span className="text-slate-400">Code:</span> <span className="font-bold text-slate-800">{placeCode}</span></p>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -297,10 +283,14 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                 {/* UPI QR */}
                 <div className="col-span-3 bg-slate-50/80 border border-slate-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
                     <span className="font-black text-[#024282] uppercase text-[9px] tracking-wider mb-1">UPI Payment</span>
-                    <div className="w-16 h-16 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs mb-1">
-                        <img src={qrUrl} alt="UPI QR" className="w-full h-full object-contain" />
-                    </div>
-                    <span className="text-[8px] font-bold text-slate-500">Scan to Pay via UPI</span>
+                    <QRCodeImage
+                        text={realQrData}
+                        alt="UPI QR"
+                        containerClassName="w-16 h-16 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs mb-1 flex items-center justify-center"
+                        unavailableText="QR Unavailable"
+                        unavailableSubtext="No UPI Configured"
+                    />
+                    <span className="text-[8px] font-bold text-slate-500">{realQrData ? 'Scan to Pay via UPI' : 'UPI Not Configured'}</span>
                     <span className="text-[8px] font-black text-[#024282] uppercase mt-0.5 tracking-wider">UPI</span>
                 </div>
 

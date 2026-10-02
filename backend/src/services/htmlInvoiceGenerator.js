@@ -1,27 +1,26 @@
-const { createQRMatrix } = require('../utils/qrGenerator');
+const QRCode = require('qrcode');
 const { calculateInvoice } = require('../utils/invoiceCalculationEngine');
 const { getCountryConfig, resolveIndianState } = require('../config/countryConfig');
 
-// ─── Pure SVG QR Generator ──────────────────────────────────────────────────
-function matrixToSVG(matrix, margin = 2) {
-    if (!matrix || !matrix.length) return '';
-    const size = matrix.length;
-    const totalSize = size + margin * 2;
-    let path = '';
-    for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-            if (matrix[r][c]) {
-                path += `M${c + margin} ${r + margin}h1v1h-1z `;
-            }
-        }
-    }
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" shape-rendering="crispEdges" style="width:100%;height:100%;"><path d="${path}" fill="#0f172a"/></svg>`;
-}
-
+// ─── Pure SVG QR Generator via 'qrcode' library ─────────────────────────────
 function getQRCodeSVG(text) {
+    if (!text || typeof text !== 'string' || !text.trim()) return '';
     try {
-        const matrix = createQRMatrix(text);
-        return matrixToSVG(matrix);
+        let svg = '';
+        QRCode.toString(text.trim(), {
+            type: 'svg',
+            margin: 1,
+            errorCorrectionLevel: 'M',
+            color: {
+                dark: '#0f172a',
+                light: '#ffffff'
+            }
+        }, (err, str) => {
+            if (!err && str) {
+                svg = str.replace('<svg ', '<svg style="width:100%;height:100%;display:block;" ');
+            }
+        });
+        return svg;
     } catch (e) {
         return '';
     }
@@ -372,7 +371,8 @@ function generateIndiaInvoiceHTML(invoice, shop, calculation) {
         iban_ifsc: shop.bank_iban_ifsc
     } : {});
 
-    const qrData = invoice.qr_code_data || `upi://pay?pa=${shop?.upi_id || 'billing@hisabi'}&pn=${encodeURIComponent(sellerName)}&am=${totals.grand_total}&cu=INR`;
+    const upiId = shop?.upi_id || invoice.upi_id || '';
+    const qrData = invoice.qr_code_data || (upiId ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(sellerName)}&am=${totals.grand_total}&cu=INR` : '');
     const qrSvg = getQRCodeSVG(qrData);
 
     const invoiceDeclaration = invoice.declaration || shop?.invoice_declaration || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
@@ -447,37 +447,24 @@ ${BASE_CSS}
             </div>
         </div>
 
-        <!-- ═══════ 2 CARDS ROW (BILL TO & PLACE OF SUPPLY) ═══════ -->
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin:12px 0;">
-            <div class="card">
-                <div class="card-title">
-                    ${ICONS.user}
-                    <span>BILL TO</span>
-                </div>
-                <div class="card-name">${customerName}</div>
-                <div class="card-info">
-                    ${customerPhone ? `<div><span style="color:#94a3b8;">Phone :</span> ${customerPhone}</div>` : ''}
-                    ${customerEmail ? `<div><span style="color:#94a3b8;">Email :</span> ${customerEmail}</div>` : ''}
-                    ${customerAddress ? `<div><span style="color:#94a3b8;">Address :</span> ${customerAddress}</div>` : ''}
-                </div>
+        <!-- ═══════ BILL TO CARD (FULL WIDTH) ═══════ -->
+        <div class="card" style="margin:12px 0;">
+            <div class="card-title">
+                ${ICONS.user}
+                <span>BILL TO (BUYER DETAILS)</span>
             </div>
-
-            <div class="card">
-                <div class="card-title">
-                    ${ICONS.truck}
-                    <span>SHIP / SUPPLY TO</span>
-                </div>
-                <div class="card-info" style="margin-top:4px;line-height:1.6;">
-                    ${customerAddress
-                        ? `<div style="font-weight:700;color:#0f172a;font-size:10px;">${customerName}</div>
-                           <div>${customerAddress}</div>`
-                        : `<div style="color:#94a3b8;">Same as billing address</div>`
-                    }
-                    <div style="margin-top:4px;padding-top:4px;border-top:1px dashed #e2e8f0;">
-                        <span style="color:#94a3b8;">State :</span> <b>${placeState}</b>
-                        &nbsp;&nbsp;
-                        <span style="color:#94a3b8;">Code :</span> <b>${placeCode}</b>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div>
+                    <div class="card-name">${customerName}</div>
+                    <div class="card-info" style="margin-top:4px;">
+                        ${customerPhone ? `<div><span style="color:#94a3b8;">Phone :</span> ${customerPhone}</div>` : ''}
+                        ${customerEmail ? `<div><span style="color:#94a3b8;">Email :</span> ${customerEmail}</div>` : ''}
                     </div>
+                </div>
+                <div class="card-info" style="border-left:1px solid #e2e8f0;padding-left:16px;">
+                    ${customerAddress ? `<div><span style="color:#94a3b8;">Address :</span> ${customerAddress}</div>` : ''}
+                    ${invoice.customer_gstin ? `<div><span style="color:#94a3b8;">GSTIN :</span> <b>${invoice.customer_gstin}</b></div>` : ''}
+                    ${invoice.customer_pan ? `<div><span style="color:#94a3b8;">PAN :</span> <b>${invoice.customer_pan}</b></div>` : ''}
                 </div>
             </div>
         </div>
@@ -598,11 +585,20 @@ ${BASE_CSS}
 
             <div class="card" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">
                 <div style="font-size:8.5px;font-weight:900;color:#024282;text-transform:uppercase;margin-bottom:4px;">UPI PAYMENT</div>
+                ${qrSvg ? `
                 <div style="width:62px;height:62px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;padding:2px;margin-bottom:4px;">
-                    ${qrSvg || '<div style="font-size:8px;color:#94a3b8;">QR Code</div>'}
+                    ${qrSvg}
                 </div>
                 <div style="font-size:7.5px;color:#64748b;font-weight:600;">Scan to Pay via UPI</div>
                 <div style="font-size:7.5px;font-weight:900;color:#024282;text-transform:uppercase;margin-top:1px;">UPI</div>
+                ` : `
+                <div style="width:62px;height:62px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;margin-bottom:4px;box-sizing:border-box;">
+                    <div style="color:#94a3b8;">${ICONS.fileText}</div>
+                    <div style="font-size:7px;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-top:2px;">QR Unavailable</div>
+                    <div style="font-size:6px;color:#94a3b8;">No UPI ID Configured</div>
+                </div>
+                <div style="font-size:7.5px;color:#94a3b8;font-weight:600;">UPI Not Configured</div>
+                `}
             </div>
 
             <div class="card">
@@ -781,40 +777,28 @@ ${BASE_CSS}
             </div>
         </div>
 
-        <!-- ═══════ 2 CARDS ROW (BILL TO, SUPPLY TO) ═══════ -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-            <div class="card" style="display:flex;justify-content:space-between;">
+        <!-- ═══════ BILL TO CARD (FULL WIDTH) ═══════ -->
+        <div class="card" style="margin-bottom:12px;">
+            <div class="card-title">
+                ${ICONS.user}
+                <span>Bill To / <span class="font-arabic">العميل</span> (Buyer Details)</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                 <div>
-                    <div class="card-title">
-                        ${ICONS.user}
-                        <span>Bill To / <span class="font-arabic">المشتري</span></span>
-                    </div>
                     <div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Customer Name</div>
                     <div class="card-name">${customerName}</div>
+                    <div class="card-info" style="margin-top:4px;">
+                        ${customerPhone ? `<div><span style="color:#94a3b8;">Phone :</span> ${customerPhone}</div>` : ''}
+                        ${customerEmail ? `<div><span style="color:#94a3b8;">Email :</span> ${customerEmail}</div>` : ''}
+                    </div>
+                </div>
+                <div class="card-info" style="border-left:1px solid #e2e8f0;padding-left:16px;">
                     ${customerAddress ? `
-                    <div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-top:4px;">Address</div>
-                    <div style="font-size:9.5px;color:#475569;">${customerAddress}</div>` : ''}
-                    <div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-top:4px;">TRN (if applicable)</div>
-                    <div style="font-family:monospace;font-size:9.5px;color:#334155;">${buyerTrn || '—'}</div>
+                    <div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Address</div>
+                    <div style="font-size:9.5px;color:#475569;margin-bottom:4px;">${customerAddress}</div>` : ''}
+                    <div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;">TRN (if applicable)</div>
+                    <div style="font-family:monospace;font-size:9.5px;color:#334155;font-weight:700;">${buyerTrn || '—'}</div>
                 </div>
-                <div style="text-align:right;padding-top:16px;font-size:9.5px;color:#64748b;">
-                    ${customerPhone ? `<div>${customerPhone}</div>` : ''}
-                    ${customerEmail ? `<div>${customerEmail}</div>` : ''}
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-title">
-                    ${ICONS.building}
-                    <span>Supply To / <span class="font-arabic">جهة التوريد</span></span>
-                </div>
-                <div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;">Same as Bill To</div>
-                <div class="card-name">${customerName}</div>
-                ${customerAddress ? `
-                <div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-top:4px;">Address</div>
-                <div style="font-size:9.5px;color:#475569;">${customerAddress}</div>` : ''}
-                <div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-top:4px;">TRN (if applicable)</div>
-                <div style="font-family:monospace;font-size:9.5px;color:#334155;">${buyerTrn || '—'}</div>
             </div>
         </div>
 
@@ -1150,39 +1134,23 @@ ${BASE_CSS}
             </div>
         </div>
 
-        <!-- ═══════ 2 CARDS ROW (BILL TO, SUPPLY DETAILS) ═══════ -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-            <div class="card">
-                <div class="card-title">
-                    ${ICONS.user}
-                    <span>Bill To / <span class="font-arabic">العميل</span></span>
-                </div>
-                <div class="card-name">${customerName}</div>
-                <div class="card-info">
-                    ${customerPhone ? `<div>${ICONS.phone} <span>${customerPhone}</span></div>` : ''}
-                    ${customerEmail ? `<div>${ICONS.mail} <span>${customerEmail}</span></div>` : ''}
-                    ${customerAddress ? `<div>${ICONS.mapPin} <span>${customerAddress}</span></div>` : ''}
-                </div>
+        <!-- ═══════ BILL TO CARD (FULL WIDTH) ═══════ -->
+        <div class="card" style="margin-bottom:12px;">
+            <div class="card-title">
+                ${ICONS.user}
+                <span>Bill To / <span class="font-arabic">العميل</span> (Buyer Details)</span>
             </div>
-
-            <div class="card">
-                <div class="card-title">
-                    ${ICONS.truck}
-                    <span>Supply / Delivery Details / <span class="font-arabic">تفاصيل التوريد</span></span>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div>
+                    <div class="card-name">${customerName}</div>
+                    <div class="card-info" style="margin-top:4px;">
+                        ${customerPhone ? `<div>${ICONS.phone} <span>${customerPhone}</span></div>` : ''}
+                        ${customerEmail ? `<div>${ICONS.mail} <span>${customerEmail}</span></div>` : ''}
+                    </div>
                 </div>
-                <div class="card-info" style="line-height:1.5;">
-                    <div style="display:flex;justify-content:space-between;">
-                        <span style="color:#94a3b8;">Supply Date / <span class="font-arabic">تاريخ التوريد</span>:</span>
-                        <b>${invoice.supply_date ? new Date(invoice.supply_date).toLocaleDateString('en-GB') : dateStr}</b>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;">
-                        <span style="color:#94a3b8;">Delivery Address / <span class="font-arabic">عنوان التسليم</span>:</span>
-                        <b>${customerAddress || '—'}</b>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;">
-                        <span style="color:#94a3b8;">Sales Representative / <span class="font-arabic">المندوب</span>:</span>
-                        <b>—</b>
-                    </div>
+                <div class="card-info" style="border-left:1px solid #e2e8f0;padding-left:16px;">
+                    ${customerAddress ? `<div>${ICONS.mapPin} <span>${customerAddress}</span></div>` : ''}
+                    ${invoice.customer_civil_id ? `<div><span style="color:#94a3b8;">Civil ID :</span> <b>${invoice.customer_civil_id}</b></div>` : ''}
                 </div>
             </div>
         </div>
@@ -1263,9 +1231,16 @@ ${BASE_CSS}
 
             <div class="card" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">
                 <div style="font-size:8px;font-weight:900;color:#024282;text-transform:uppercase;margin-bottom:4px;">Scan to Pay / <span class="font-arabic">امسح للدفع</span></div>
+                ${qrSvg ? `
                 <div style="width:58px;height:58px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;padding:2px;margin-bottom:4px;">
-                    ${qrSvg || '<div style="font-size:8px;color:#94a3b8;">QR</div>'}
+                    ${qrSvg}
                 </div>
+                ` : `
+                <div style="width:58px;height:58px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;margin-bottom:4px;box-sizing:border-box;">
+                    <div style="color:#94a3b8;">${ICONS.fileText}</div>
+                    <div style="font-size:7px;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-top:2px;">QR Unavailable</div>
+                </div>
+                `}
                 <div style="font-size:7.5px;color:#94a3b8;">Pay securely with</div>
                 <div style="display:flex;align-items:center;gap:4px;margin-top:2px;">
                     <span style="background:#1d4ed8;color:#fff;padding:1px 4px;border-radius:3px;font-size:7px;font-weight:900;">KNET</span>

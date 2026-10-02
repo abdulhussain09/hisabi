@@ -4,6 +4,7 @@ import {
     Calendar, Phone, Mail, Globe, MapPin, Info, FileText
 } from 'lucide-react';
 import { DubaiSkyline } from './DubaiSkyline';
+import QRCodeImage from './QRCodeImage';
 
 const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
     const { items, totals, meta } = calculation;
@@ -124,44 +125,37 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
                 </div>
             </div>
 
-            {/* ═══════ 2 CARDS ROW (BILL TO, SUPPLY TO) ═══════ */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-                {/* Bill To */}
-                <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-3 flex justify-between">
-                    <div>
-                        <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
-                            <div className="w-4 h-4 rounded-full bg-sky-500 text-white flex items-center justify-center">
-                                <User className="w-2.5 h-2.5" />
-                            </div>
-                            <span>Bill To / المشتري</span>
-                        </div>
-                        <p className="text-[9px] text-slate-400 uppercase font-bold">Customer Name</p>
-                        <p className="font-black text-xs text-slate-900">{customerName}</p>
-                        <p className="text-[9px] text-slate-400 uppercase font-bold mt-1.5">Address</p>
-                        <p className="text-slate-600 text-[10px] whitespace-pre-line">{customerAddress}</p>
-                        <p className="text-[9px] text-slate-400 uppercase font-bold mt-1.5">TRN (if applicable)</p>
-                        <p className="font-mono text-slate-700 text-[10px]">{buyerTrn || '—'}</p>
+            {/* ═══════ BILL TO CARD (FULL WIDTH) ═══════ */}
+            <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-3 mb-4">
+                <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
+                    <div className="w-4 h-4 rounded-full bg-sky-500 text-white flex items-center justify-center">
+                        <User className="w-2.5 h-2.5" />
                     </div>
-                    <div className="text-right space-y-1 text-slate-600 text-[10px] pt-5">
+                    <span>Bill To / المشتري</span>
+                </div>
+                <div className="grid grid-cols-12 gap-3 items-start">
+                    <div className="col-span-7 space-y-1">
+                        <div>
+                            <p className="text-[9px] text-slate-400 uppercase font-bold">Customer Name</p>
+                            <p className="font-black text-xs text-slate-900">{customerName}</p>
+                        </div>
+                        {customerAddress && (
+                            <div>
+                                <p className="text-[9px] text-slate-400 uppercase font-bold">Address</p>
+                                <p className="text-slate-600 text-[10px] whitespace-pre-line">{customerAddress}</p>
+                            </div>
+                        )}
+                        {buyerTrn && (
+                            <div>
+                                <p className="text-[9px] text-slate-400 uppercase font-bold">TRN (if applicable)</p>
+                                <p className="font-mono text-slate-700 text-[10px]">{buyerTrn}</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="col-span-5 text-right space-y-1 text-slate-600 text-[10px] pt-1">
                         {customerPhone && <p className="flex items-center justify-end gap-1"><Phone className="w-3 h-3 text-slate-400" /> {customerPhone}</p>}
                         {customerEmail && <p className="flex items-center justify-end gap-1"><Mail className="w-3 h-3 text-slate-400" /> {customerEmail}</p>}
                     </div>
-                </div>
-
-                {/* Supply To */}
-                <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-3">
-                    <div className="flex items-center gap-1.5 text-[#024282] font-black text-[10px] uppercase tracking-wider mb-1.5">
-                        <div className="w-4 h-4 rounded-full bg-sky-500 text-white flex items-center justify-center">
-                            <Building2 className="w-2.5 h-2.5" />
-                        </div>
-                        <span>Supply To / جهة التوريد</span>
-                    </div>
-                    <p className="text-[9px] text-slate-400 uppercase font-bold">Same as Bill To</p>
-                    <p className="font-black text-xs text-slate-900">{customerName}</p>
-                    <p className="text-[9px] text-slate-400 uppercase font-bold mt-1.5">Address</p>
-                    <p className="text-slate-600 text-[10px] whitespace-pre-line">{customerAddress}</p>
-                    <p className="text-[9px] text-slate-400 uppercase font-bold mt-1.5">TRN (if applicable)</p>
-                    <p className="font-mono text-slate-700 text-[10px]">{buyerTrn || '—'}</p>
                 </div>
             </div>
 
@@ -320,9 +314,13 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
 
                 {/* QR / Payment */}
                 <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-3 flex items-center gap-3">
-                    <div className="w-16 h-16 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs flex-shrink-0">
-                        <img src={qrUrl} alt="ZATCA QR" className="w-full h-full object-contain" />
-                    </div>
+                    <QRCodeImage
+                        text={qrData}
+                        alt="ZATCA QR"
+                        containerClassName="w-16 h-16 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs flex-shrink-0 flex items-center justify-center"
+                        unavailableText="QR Unavailable"
+                        unavailableSubtext="No QR Data"
+                    />
                     <div className="space-y-0.5">
                         <span className="font-black text-[#024282] uppercase text-[9px] tracking-wider block">QR / Payment</span>
                         <p className="text-[9px] text-slate-500 leading-snug">

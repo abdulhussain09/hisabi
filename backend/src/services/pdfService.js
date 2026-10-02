@@ -49,27 +49,27 @@ function setStroke(doc, hex) {
 // ─── Chrome Headless PDF Generator (Exact Visual Parity) ───────────────────
 
 async function generateInvoicePDFWithChrome(invoice, shop) {
-    const html = generateInvoiceHTML(invoice, shop);
-    const tmpId = `hisabi_inv_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const tmpHtml = path.join(os.tmpdir(), `${tmpId}.html`);
-    const tmpPdf = path.join(os.tmpdir(), `${tmpId}.pdf`);
+    const plainInvoice = typeof invoice?.toJSON === 'function' ? invoice.toJSON() : invoice;
+    const plainShop = typeof shop?.toJSON === 'function' ? shop.toJSON() : shop;
+    const html = generateInvoiceHTML(plainInvoice, plainShop);
+    const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hisabi_chrome_'));
+    const tmpHtml = path.join(tmpDir, 'invoice.html');
+    const tmpPdf = path.join(tmpDir, 'invoice.pdf');
 
     await fs.promises.writeFile(tmpHtml, html, 'utf8');
 
     return new Promise((resolve, reject) => {
-        const cmd = `google-chrome --headless --disable-gpu --no-sandbox --no-pdf-header-footer --print-to-pdf="${tmpPdf}" "${tmpHtml}"`;
+        const cmd = `google-chrome --headless=new --disable-gpu --no-sandbox --no-pdf-header-footer --user-data-dir="${tmpDir}" --print-to-pdf="${tmpPdf}" "${tmpHtml}"`;
         exec(cmd, { timeout: 15000 }, async (error) => {
             try {
                 if (error) {
                     throw error;
                 }
                 const buffer = await fs.promises.readFile(tmpPdf);
-                fs.unlink(tmpHtml, () => {});
-                fs.unlink(tmpPdf, () => {});
+                fs.rm(tmpDir, { recursive: true, force: true }, () => {});
                 resolve(buffer);
             } catch (err) {
-                fs.unlink(tmpHtml, () => {});
-                fs.unlink(tmpPdf, () => {});
+                fs.rm(tmpDir, { recursive: true, force: true }, () => {});
                 reject(err);
             }
         });
