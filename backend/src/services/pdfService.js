@@ -6,7 +6,7 @@ const os = require('os');
 const { createQRMatrix, matrixToBMPBuffer } = require('../utils/qrGenerator');
 const { calculateInvoice } = require('../utils/invoiceCalculationEngine');
 const { getCountryConfig, resolveIndianState } = require('../config/countryConfig');
-const { generateInvoiceHTML } = require('./htmlInvoiceGenerator');
+const { renderInvoiceToHTML } = require('./ssrInvoiceRenderer');
 
 // ─── Color Palette ─────────────────────────────────────────────────────────
 
@@ -51,7 +51,10 @@ function setStroke(doc, hex) {
 async function generateInvoicePDFWithChrome(invoice, shop) {
     const plainInvoice = typeof invoice?.toJSON === 'function' ? invoice.toJSON() : invoice;
     const plainShop = typeof shop?.toJSON === 'function' ? shop.toJSON() : shop;
-    const html = generateInvoiceHTML(plainInvoice, plainShop);
+
+    // Use the SSR renderer — renders the actual React components so the PDF
+    // is pixel-perfect identical to the browser preview.
+    const html = await renderInvoiceToHTML(plainInvoice, plainShop);
 
     // Use separate dirs: one for HTML/PDF output, one for Chrome user-data
     const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hisabi_chrome_'));
@@ -69,7 +72,7 @@ async function generateInvoicePDFWithChrome(invoice, shop) {
     return new Promise((resolve, reject) => {
         // file:// prefix ensures Chrome loads the HTML from disk correctly
         const cmd = `google-chrome --headless=new --disable-gpu --no-sandbox --no-pdf-header-footer --user-data-dir="${userDataDir}" --print-to-pdf="${tmpPdf}" "file://${tmpHtml}"`;
-        exec(cmd, { timeout: 20000 }, async (error) => {
+        exec(cmd, { timeout: 30000 }, async (error) => {
             try {
                 if (error) throw error;
                 const buffer = await fs.promises.readFile(tmpPdf);
