@@ -52,42 +52,54 @@ async function generateInvoicePDFWithChrome(invoice, shop) {
     const plainInvoice = typeof invoice?.toJSON === 'function' ? invoice.toJSON() : invoice;
     const plainShop = typeof shop?.toJSON === 'function' ? shop.toJSON() : shop;
     const html = generateInvoiceHTML(plainInvoice, plainShop);
-    const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hisabi_chrome_'));
-    const tmpHtml = path.join(tmpDir, 'invoice.html');
-    const tmpPdf = path.join(tmpDir, 'invoice.pdf');
+
+    // Use separate dirs: one for HTML/PDF output, one for Chrome user-data
+    const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hisabi_chrome_'));
+    const userDataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hisabi_ud_'));
+    const tmpHtml = path.join(workDir, 'invoice.html');
+    const tmpPdf = path.join(workDir, 'invoice.pdf');
 
     await fs.promises.writeFile(tmpHtml, html, 'utf8');
 
+    const cleanup = () => {
+        fs.rm(workDir, { recursive: true, force: true }, () => {});
+        fs.rm(userDataDir, { recursive: true, force: true }, () => {});
+    };
+
     return new Promise((resolve, reject) => {
-        const cmd = `google-chrome --headless=new --disable-gpu --no-sandbox --no-pdf-header-footer --user-data-dir="${tmpDir}" --print-to-pdf="${tmpPdf}" "${tmpHtml}"`;
-        exec(cmd, { timeout: 15000 }, async (error) => {
+        // file:// prefix ensures Chrome loads the HTML from disk correctly
+        const cmd = `google-chrome --headless=new --disable-gpu --no-sandbox --no-pdf-header-footer --user-data-dir="${userDataDir}" --print-to-pdf="${tmpPdf}" "file://${tmpHtml}"`;
+        exec(cmd, { timeout: 20000 }, async (error) => {
             try {
-                if (error) {
-                    throw error;
-                }
+                if (error) throw error;
                 const buffer = await fs.promises.readFile(tmpPdf);
-                fs.rm(tmpDir, { recursive: true, force: true }, () => {});
+                cleanup();
                 resolve(buffer);
             } catch (err) {
-                fs.rm(tmpDir, { recursive: true, force: true }, () => {});
+                cleanup();
                 reject(err);
             }
         });
     });
 }
 
-// ─── Master PDF Generator (Chrome first, PDFKit resilient fallback) ─────────
+// ─── Master PDF Generator ────────────────────────────────────────────────────
+// Chrome is the only renderer — it produces exact visual parity with the
+// HTML preview. PDFKit fallback is kept as last-resort safety net only.
 
 const generateInvoicePDF = async (invoice, shop) => {
     try {
         const buffer = await generateInvoicePDFWithChrome(invoice, shop);
         if (buffer && buffer.length > 0) {
+            console.log('[PDF] Chrome render succeeded, size:', buffer.length);
             return buffer;
         }
+        throw new Error('Chrome produced an empty buffer');
     } catch (err) {
-        console.warn('Chrome PDF generator unavailable, using PDFKit fallback:', err.message);
+        console.error('[PDF] Chrome render FAILED:', err.message);
+        console.warn('[PDF] Falling back to PDFKit (legacy layout)');
+        return generateInvoicePDFKit(invoice, shop);
     }
-    return generateInvoicePDFKit(invoice, shop);
 };
 
 // ─── PDFKit Fallback Generator ─────────────────────────────────────────────
