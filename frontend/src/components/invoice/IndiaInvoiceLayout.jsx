@@ -95,43 +95,33 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                     <span className="font-black text-slate-800 text-[10px] tracking-wide">GSTIN NO: {gstin}</span>
                 </div>
 
-                {/* Right: TAX INVOICE title + decorative blue strip + metadata */}
-                <div className="relative flex flex-col justify-center pr-7 pl-5 text-right min-w-[200px]">
-                    {/* Decorative blue triangle/strip top-right */}
-                    <div className="absolute top-0 right-0 w-20 h-20 overflow-hidden">
-                        <div className="absolute top-0 right-0 w-0 h-0"
-                            style={{
-                                borderStyle: 'solid',
-                                borderWidth: '0 80px 80px 0',
-                                borderColor: 'transparent #024282 transparent transparent'
-                            }}
-                        />
-                    </div>
-                    <h1 className="text-xl font-black text-[#024282] uppercase tracking-wide relative z-10">TAX INVOICE</h1>
+                {/* Right: TAX INVOICE title + metadata card */}
+                <div className="flex flex-col justify-center pr-7 pl-5 text-right min-w-[210px]">
+                    <h1 className="text-xl font-black text-[#024282] uppercase tracking-wide">TAX INVOICE</h1>
                     <p className="text-[9px] font-bold text-slate-400 uppercase -mt-0.5">(GST INVOICE)</p>
-                    <div className="mt-3 text-[10.5px] space-y-0.5 font-medium text-slate-700">
-                        <div className="flex justify-end gap-2">
-                            <span className="text-slate-400">Invoice No.</span>
-                            <span className="font-bold text-slate-900 w-24 text-left">: #{String(invoice.invoice_number || '1').padStart(4, '0')}</span>
+                    <div className="mt-2 bg-blue-50/60 border border-blue-100 rounded-xl p-2.5 text-[10.5px] space-y-0.5 font-medium text-slate-700 text-left">
+                        <div className="flex justify-between items-center gap-2">
+                            <span className="text-slate-500 font-semibold text-[10px]">Invoice No.</span>
+                            <span className="font-bold text-slate-900">: #{String(invoice.invoice_number || '1').padStart(4, '0')}</span>
                         </div>
-                        <div className="flex justify-end gap-2">
-                            <span className="text-slate-400">Date</span>
-                            <span className="font-bold text-slate-900 w-24 text-left">: {dateStr}</span>
+                        <div className="flex justify-between items-center gap-2">
+                            <span className="text-slate-500 font-semibold text-[10px]">Date</span>
+                            <span className="font-bold text-slate-900">: {dateStr}</span>
                         </div>
-                        <div className="flex justify-end gap-2">
-                            <span className="text-slate-400">Time</span>
-                            <span className="font-bold text-slate-900 w-24 text-left">: {timeStr}</span>
+                        <div className="flex justify-between items-center gap-2">
+                            <span className="text-slate-500 font-semibold text-[10px]">Time</span>
+                            <span className="font-bold text-slate-900">: {timeStr}</span>
                         </div>
-                        <div className="flex justify-end gap-2">
-                            <span className="text-slate-400">Payment Method</span>
-                            <span className="font-bold text-slate-900 w-24 text-left flex items-center gap-1">
+                        <div className="flex justify-between items-center gap-2">
+                            <span className="text-slate-500 font-semibold text-[10px]">Payment Method</span>
+                            <span className="font-bold text-slate-900 flex items-center gap-1">
                                 : <CreditCard className="w-3 h-3 text-[#024282] inline" /> {paymentMethod}
                             </span>
                         </div>
                         {financeCompany && (
-                            <div className="flex justify-end gap-2">
-                                <span className="text-slate-400">Finance Co.</span>
-                                <span className="font-bold text-slate-900 w-24 text-left">: {financeCompany}</span>
+                            <div className="flex justify-between items-center gap-2">
+                                <span className="text-slate-500 font-semibold text-[10px]">Finance Co.</span>
+                                <span className="font-bold text-slate-900">: {financeCompany}</span>
                             </div>
                         )}
                     </div>

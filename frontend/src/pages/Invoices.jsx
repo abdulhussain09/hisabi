@@ -5,7 +5,7 @@ import {
     Printer, Download, Search, FileText, User,
     ChevronLeft, ChevronRight, CheckCircle2, Trash2,
     Circle, AlertCircle, ChevronDown, ChevronUp, Tag,
-    Clock, Crown, Edit3, Eye, X
+    Clock, Crown, Edit3, Eye, X, Loader2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +22,7 @@ const StatusBadge = ({ status }) => {
     return <span className="bg-slate-50 text-slate-500 px-2.5 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1.5 border border-slate-100"><Circle className="w-3 h-3" />{t('invoices.status.void')}</span>;
 };
 
-const InvoiceRow = ({ inv, user, onDelete, onDownload, onEdit, onView, currency }) => {
+const InvoiceRow = ({ inv, user, onDelete, onDownload, onEdit, onView, currency, isDownloading }) => {
     const { t } = useTranslation();
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -102,10 +102,11 @@ const InvoiceRow = ({ inv, user, onDelete, onDownload, onEdit, onView, currency 
                         </button>
                         <button
                             onClick={() => onDownload(inv.id, inv.invoice_number)}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-sm transition-all shadow-sm"
+                            disabled={isDownloading}
+                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-sm transition-all shadow-sm disabled:opacity-50"
                             title="Download PDF"
                         >
-                            <Download className="w-4 h-4" />
+                            {isDownloading ? <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> : <Download className="w-4 h-4" />}
                         </button>
                         {user?.role === 'admin' && (
                             <button
@@ -266,15 +267,26 @@ const Invoices = () => {
         }
     };
 
+    const [downloadingId, setDownloadingId] = useState(null);
+
     const handleDownload = async (id, num) => {
         try {
+            setDownloadingId(id);
             const res = await api.get(`/invoices/${id}/pdf`, { responseType: 'blob' });
-            const url = URL.createObjectURL(new Blob([res.data]));
+            const blob = new Blob([res.data], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `invoice-${num}.pdf`;
+            document.body.appendChild(a);
             a.click();
-        } catch { alert(t('invoices.errors.download_failed')); }
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+        } catch {
+            alert(t('invoices.errors.download_failed'));
+        } finally {
+            setDownloadingId(null);
+        }
     };
 
     const handleSaveInvoiceEdit = async (updatedData) => {
@@ -437,6 +449,7 @@ const Invoices = () => {
                                         onEdit={setEditingInvoice}
                                         onView={setViewingInvoice}
                                         currency={currency}
+                                        isDownloading={downloadingId === inv.id}
                                     />
                                 ))
                             )}

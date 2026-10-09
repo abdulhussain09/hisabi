@@ -45,13 +45,12 @@ function ensureBabel() {
     require('@babel/register').default({
         extensions: ['.js', '.jsx'],
         presets: [
-            [require.resolve(path.resolve(__dirname, '../../../backend/node_modules/@babel/preset-env')), { targets: { node: 'current' }, modules: 'commonjs' }],
-            [require.resolve(path.resolve(__dirname, '../../../backend/node_modules/@babel/preset-react')), { runtime: 'automatic' }],
+            [require.resolve(path.resolve(__dirname, '../../node_modules/@babel/preset-env')), { targets: { node: 'current' }, modules: 'commonjs' }],
+            [require.resolve(path.resolve(__dirname, '../../node_modules/@babel/preset-react')), { runtime: 'automatic' }],
         ],
         only: [
-            // Transpile the frontend source tree and lucide-react icons
+            // Transpile the frontend JSX source tree
             new RegExp(FRONTEND_ROOT.replace(/\\/g, '\\\\')),
-            /node_modules[\\/\\\\]lucide-react/,
         ],
         cache: true,
     });
@@ -90,8 +89,8 @@ const _origLoad = Module._load.bind(Module);
 let _patchApplied = false;
 
 // Pre-resolve the backend's React paths once
-const BACKEND_REACT     = path.resolve(__dirname, '../../../backend/node_modules/react');
-const BACKEND_REACT_DOM = path.resolve(__dirname, '../../../backend/node_modules/react-dom');
+const BACKEND_REACT     = path.resolve(__dirname, '../../node_modules/react');
+const BACKEND_REACT_DOM = path.resolve(__dirname, '../../node_modules/react-dom');
 
 function applyModulePatch() {
     if (_patchApplied) return;

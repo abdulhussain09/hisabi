@@ -48,6 +48,26 @@ function setStroke(doc, hex) {
 
 // ─── Chrome Headless PDF Generator (Exact Visual Parity) ───────────────────
 
+// Helper to resolve available Chrome / Chromium binary
+function getChromeBinary() {
+    const candidates = [
+        'google-chrome',
+        'google-chrome-stable',
+        'chromium-browser',
+        'chromium',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium'
+    ];
+    for (const bin of candidates) {
+        if (bin.startsWith('/')) {
+            if (fs.existsSync(bin)) return bin;
+        }
+    }
+    return 'google-chrome';
+}
+
 async function generateInvoicePDFWithChrome(invoice, shop) {
     const plainInvoice = typeof invoice?.toJSON === 'function' ? invoice.toJSON() : invoice;
     const plainShop = typeof shop?.toJSON === 'function' ? shop.toJSON() : shop;
@@ -69,9 +89,11 @@ async function generateInvoicePDFWithChrome(invoice, shop) {
         fs.rm(userDataDir, { recursive: true, force: true }, () => {});
     };
 
+    const chromeBin = getChromeBinary();
+
     return new Promise((resolve, reject) => {
         // file:// prefix ensures Chrome loads the HTML from disk correctly
-        const cmd = `google-chrome --headless=new --disable-gpu --no-sandbox --no-pdf-header-footer --user-data-dir="${userDataDir}" --print-to-pdf="${tmpPdf}" "file://${tmpHtml}"`;
+        const cmd = `"${chromeBin}" --headless=new --disable-gpu --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --no-pdf-header-footer --user-data-dir="${userDataDir}" --print-to-pdf="${tmpPdf}" "file://${tmpHtml}"`;
         exec(cmd, { timeout: 30000 }, async (error) => {
             try {
                 if (error) throw error;
