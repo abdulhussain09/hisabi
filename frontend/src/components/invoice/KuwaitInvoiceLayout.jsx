@@ -402,14 +402,14 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
             <div className="grid grid-cols-2 gap-6 pt-3 border-t border-slate-200 text-[10px] mb-3">
                 <div>
                     <p className="font-bold text-slate-700">Customer's Signature / <span className="font-arabic font-normal">توقيع العميل</span></p>
-                    <div className="w-48 border-b border-dashed border-slate-300 mt-14"></div>
+                    <div className="w-48 border-b border-dashed border-slate-300 mt-8"></div>
                     <p className="text-[8.5px] text-slate-400 mt-1">Seal &amp; Signature / <span className="font-arabic">الختم والتوقيع</span></p>
                 </div>
 
                 <div className="text-right">
                     <p className="font-bold text-slate-700">Authorised Signatory / <span className="font-arabic font-normal">المفوض بالتوقيع</span></p>
                     <p className="text-[9px] text-slate-400 mt-0.5">For {sellerName}</p>
-                    <div className="w-48 border-b border-dashed border-slate-300 mt-14 ml-auto"></div>
+                    <div className="w-48 border-b border-dashed border-slate-300 mt-8 ml-auto"></div>
                     <p className="text-[8.5px] text-slate-400 mt-1">Official Stamp / <span className="font-arabic">الختم الرسمي</span></p>
                 </div>
             </div>
