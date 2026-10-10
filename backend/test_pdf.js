@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const assert = require('assert');
-const { generateInvoicePDF, generateInvoicePDFKit } = require('./src/services/pdfService');
+const pdfService = require('./src/services/pdfService');
+const { generateInvoicePDF, generateDueReceiptPDF } = pdfService;
 const QRCode = require('qrcode');
 
 function getPageCount(filePath) {
@@ -271,91 +272,77 @@ async function run() {
 
 
     console.log('\n=================================================================');
-    console.log('=== STEP 4: Testing PDFKit Fallback Renderer                  ===');
+    console.log('=== STEP 4: Regression Tests (Legacy PDFKit Removal & Due PDF)===');
     console.log('=================================================================');
 
-    const kitIN = await generateInvoicePDFKit(sampleInvoiceIN, sampleShopIN);
-    const kitINPath = path.join(outDir, 'kit_IN.pdf');
-    fs.writeFileSync(kitINPath, kitIN);
-    assert(Buffer.isBuffer(kitIN) && kitIN.length > 3000, 'PDFKit IN PDF must be a non-empty buffer');
-    console.log('✓ PDFKit IN PDF generated:', kitIN.length, 'bytes');
+    // 4.1 Verify legacy generateInvoicePDFKit is completely removed
+    assert.strictEqual(
+        typeof pdfService.generateInvoicePDFKit,
+        'undefined',
+        'Legacy generateInvoicePDFKit must NOT be exported or defined'
+    );
+    console.log('✓ Verified: Legacy generateInvoicePDFKit function is completely removed');
 
-    const kitINNoUPI = await generateInvoicePDFKit(sampleInvoiceINNoUPI, sampleShopINNoUPI);
-    const kitINNoUPIPath = path.join(outDir, 'kit_IN_no_upi.pdf');
-    fs.writeFileSync(kitINNoUPIPath, kitINNoUPI);
-    assert(Buffer.isBuffer(kitINNoUPI) && kitINNoUPI.length > 3000, 'PDFKit IN No-UPI PDF must be a non-empty buffer');
-    console.log('✓ PDFKit IN No-UPI PDF generated:', kitINNoUPI.length, 'bytes');
-
-    const kitAE = await generateInvoicePDFKit(sampleInvoiceAE, sampleShopAE);
-    const kitAEPath = path.join(outDir, 'kit_AE.pdf');
-    fs.writeFileSync(kitAEPath, kitAE);
-    assert(Buffer.isBuffer(kitAE) && kitAE.length > 3000, 'PDFKit AE PDF must be a non-empty buffer');
-    console.log('✓ PDFKit AE PDF generated:', kitAE.length, 'bytes');
-
-    const kitKW = await generateInvoicePDFKit(sampleInvoiceKW, sampleShopKW);
-    const kitKWPath = path.join(outDir, 'kit_KW.pdf');
-    fs.writeFileSync(kitKWPath, kitKW);
-    assert(Buffer.isBuffer(kitKW) && kitKW.length > 3000, 'PDFKit KW PDF must be a non-empty buffer');
-    console.log('✓ PDFKit KW PDF generated:', kitKW.length, 'bytes');
+    // 4.2 Verify generateDueReceiptPDF is preserved and functional
+    const sampleDuePayment = {
+        due_invoice_number: 'REC-0001',
+        payment_date: new Date(),
+        amount: '150.00',
+        remaining_balance: '50.00',
+        payment_method: 'Cash'
+    };
+    const sampleDueInvoice = {
+        invoice_number: 'INV-0010',
+        customer_name: 'Test Customer',
+        grand_total: '200.00',
+        paid_amount: '150.00'
+    };
+    const sampleDueShop = {
+        name: 'Hisabi Due Shop',
+        currency: 'AED',
+        brand_color: '#4f46e5'
+    };
+    const dueReceiptBuf = await generateDueReceiptPDF(sampleDuePayment, sampleDueInvoice, sampleDueShop);
+    assert(Buffer.isBuffer(dueReceiptBuf) && dueReceiptBuf.length > 1000, 'Due payment receipt PDF must be generated');
+    console.log('✓ Verified: Independent generateDueReceiptPDF remains fully functional');
 
 
     console.log('\n=================================================================');
     console.log('=== STEP 5: Extracted Text and Regional Safety Assertions     ===');
     console.log('=================================================================');
 
-    // 5.1 UAE Safety Assertions (Chrome and PDFKit)
+    // 5.1 UAE Safety Assertions (Chrome)
     const textChromeAE = getPdfText(chromeAEPath);
-    const textKitAE = getPdfText(kitAEPath);
+    assert(!textChromeAE.includes('Scan to Pay via UPI'), 'Chrome AE must NOT contain \'Scan to Pay via UPI\'');
+    assert(!textChromeAE.includes('hisabi@upi'), 'Chrome AE must NOT contain \'hisabi@upi\'');
+    assert(!textChromeAE.includes('https://hisabi.com/verify'), 'Chrome AE must NOT contain fabricated verify URL');
+    assert(!textChromeAE.includes('Branch & IFSC'), 'Chrome AE must NOT contain Indian \'Branch & IFSC\'');
+    assert(!textChromeAE.includes('Branch/IFSC'), 'Chrome AE must NOT contain Indian \'Branch/IFSC\'');
+    console.log('✓ Chrome AE passed all regional text safety assertions');
 
-    [
-        { name: 'Chrome AE', text: textChromeAE },
-        { name: 'PDFKit AE', text: textKitAE }
-    ].forEach(({ name, text }) => {
-        assert(!text.includes('Scan to Pay via UPI'), `${name} must NOT contain 'Scan to Pay via UPI'`);
-        assert(!text.includes('hisabi@upi'), `${name} must NOT contain 'hisabi@upi'`);
-        assert(!text.includes('https://hisabi.com/verify'), `${name} must NOT contain fabricated verify URL`);
-        assert(!text.includes('Branch & IFSC'), `${name} must NOT contain Indian 'Branch & IFSC'`);
-        assert(!text.includes('Branch/IFSC'), `${name} must NOT contain Indian 'Branch/IFSC'`);
-        console.log(`✓ ${name} passed all regional text safety assertions`);
-    });
-
-    // 5.2 Kuwait Safety Assertions (Chrome and PDFKit)
+    // 5.2 Kuwait Safety Assertions (Chrome)
     const textChromeKW = getPdfText(chromeKWPath);
-    const textKitKW = getPdfText(kitKWPath);
+    assert(!textChromeKW.includes('https://knet.com.kw/pay'), 'Chrome KW must NOT contain fabricated KNET pay URL');
+    assert(!textChromeKW.includes('Kuwait Finance House'), 'Chrome KW must NOT contain dummy \'Kuwait Finance House\'');
+    assert(!textChromeKW.includes('KFHKWKWXXX'), 'Chrome KW must NOT contain dummy \'KFHKWKWXXX\'');
+    assert(!textChromeKW.includes('Branch & IFSC'), 'Chrome KW must NOT contain Indian \'Branch & IFSC\'');
+    assert(!textChromeKW.includes('Branch/IBAN'), 'Chrome KW must NOT contain unconfirmed \'Branch/IBAN\'');
+    assert(!textChromeKW.includes('KNET  |  VISA  |  Mastercard'), 'Chrome KW must NOT contain unconfigured payment badges');
+    assert(!textChromeKW.includes('Pay securely with'), 'Chrome KW must NOT contain unconfigured \'Pay securely with\'');
+    console.log('✓ Chrome KW passed all regional text safety assertions');
 
-    [
-        { name: 'Chrome KW', text: textChromeKW },
-        { name: 'PDFKit KW', text: textKitKW }
-    ].forEach(({ name, text }) => {
-        assert(!text.includes('https://knet.com.kw/pay'), `${name} must NOT contain fabricated KNET pay URL`);
-        assert(!text.includes('Kuwait Finance House'), `${name} must NOT contain dummy 'Kuwait Finance House'`);
-        assert(!text.includes('KFHKWKWXXX'), `${name} must NOT contain dummy 'KFHKWKWXXX'`);
-        assert(!text.includes('Branch & IFSC'), `${name} must NOT contain Indian 'Branch & IFSC'`);
-        assert(!text.includes('Branch/IBAN'), `${name} must NOT contain unconfirmed 'Branch/IBAN'`);
-        assert(!text.includes('KNET  |  VISA  |  Mastercard'), `${name} must NOT contain unconfigured payment badges`);
-        assert(!text.includes('Pay securely with'), `${name} must NOT contain unconfigured 'Pay securely with'`);
-        console.log(`✓ ${name} passed all regional text safety assertions`);
-    });
-
-    // 5.3 India Preserved Functionality vs Safe Unconfigured Assertions
+    // 5.3 India Preserved Functionality vs Safe Unconfigured Assertions (Chrome)
     const textChromeIN = getPdfText(chromeINPath);
-    const textKitIN = getPdfText(kitINPath);
     const textChromeINNoUPI = getPdfText(chromeINNoUPIPath);
-    const textKitINNoUPI = getPdfText(kitINNoUPIPath);
 
     // With configured UPI
     assert(textChromeIN.includes('sharma@okhdfcbank') || textChromeIN.includes('UPI'), 'India Chrome must display UPI section');
-    assert(textKitIN.includes('UPI PAYMENT') && textKitIN.includes('Scan to Pay'), 'India PDFKit must display UPI Payment and Scan to Pay');
     assert(!textChromeIN.includes('hisabi@upi'), 'India Chrome must NEVER contain hisabi@upi');
-    assert(!textKitIN.includes('hisabi@upi'), 'India PDFKit must NEVER contain hisabi@upi');
 
     // Without configured UPI
     assert(!textChromeINNoUPI.includes('hisabi@upi'), 'India Chrome No-UPI must NEVER contain hisabi@upi');
-    assert(!textKitINNoUPI.includes('hisabi@upi'), 'India PDFKit No-UPI must NEVER contain hisabi@upi');
     assert(!textChromeINNoUPI.includes('sharma@okhdfcbank'), 'India Chrome No-UPI must NOT have sharma@okhdfcbank');
-    assert(!textKitINNoUPI.includes('sharma@okhdfcbank'), 'India PDFKit No-UPI must NOT have sharma@okhdfcbank');
     assert(textChromeINNoUPI.includes('No UPI Configured') || textChromeINNoUPI.includes('UPI Not Configured'), 'India Chrome No-UPI must indicate UPI Not Configured');
-    assert(textKitINNoUPI.includes('UPI Not Configured'), 'India PDFKit No-UPI must indicate UPI Not Configured');
     console.log('✓ India invoices verified with configured UPI and unconfigured UPI (zero hisabi@upi occurrences)');
 
 
@@ -368,10 +355,6 @@ async function run() {
         { file: chromeINNoUPIPath, expected: 1, label: 'Chrome IN No-UPI fixture (2 items)' },
         { file: chromeAEPath, expected: 1, label: 'Chrome AE standard fixture (2 items)' },
         { file: chromeKWPath, expected: 1, label: 'Chrome KW standard fixture (2 items)' },
-        { file: kitINPath, expected: 1, label: 'PDFKit IN standard fixture (2 items)' },
-        { file: kitINNoUPIPath, expected: 1, label: 'PDFKit IN No-UPI fixture (2 items)' },
-        { file: kitAEPath, expected: 1, label: 'PDFKit AE standard fixture (2 items)' },
-        { file: kitKWPath, expected: 1, label: 'PDFKit KW standard fixture (2 items)' },
         { file: chromeMultiINPath, expected: 2, label: 'Chrome Multi-item IN fixture (25 items)' }
     ];
 
@@ -395,14 +378,10 @@ async function run() {
     execSync(`pdftoppm -png -r 150 "${chromeAEPath}" "${path.join(outDir, 'preview_chrome_AE')}"`);
     execSync(`pdftoppm -png -r 150 "${chromeKWPath}" "${path.join(outDir, 'preview_chrome_KW')}"`);
     execSync(`pdftoppm -png -r 150 "${chromeMultiINPath}" "${path.join(outDir, 'preview_chrome_IN_multi')}"`);
-    execSync(`pdftoppm -png -r 150 "${kitINPath}" "${path.join(outDir, 'preview_kit_IN')}"`);
-    execSync(`pdftoppm -png -r 150 "${kitINNoUPIPath}" "${path.join(outDir, 'preview_kit_IN_no_upi')}"`);
-    execSync(`pdftoppm -png -r 150 "${kitAEPath}" "${path.join(outDir, 'preview_kit_AE')}"`);
-    execSync(`pdftoppm -png -r 150 "${kitKWPath}" "${path.join(outDir, 'preview_kit_KW')}"`);
     console.log('✓ Visual PNG previews rendered to test_output');
 
     console.log('\n=================================================================');
-    console.log('=== ALL PHASE 1 AUTOMATED TESTS PASSED SUCCESSFULLY!          ===');
+    console.log('=== ALL PHASE 2 AUTOMATED TESTS PASSED SUCCESSFULLY!          ===');
     console.log('=================================================================');
 }
 
