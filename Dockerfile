@@ -1,8 +1,8 @@
 # Production Dockerfile for Hisabi Backend with Headless Chromium & Fonts
-FROM node:20-bullseye-slim
+FROM node:20-bookworm-slim
 
 # Install Chromium and fonts (including Arabic and Latin font support)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     chromium \
     fonts-liberation \
     fonts-noto-core \
