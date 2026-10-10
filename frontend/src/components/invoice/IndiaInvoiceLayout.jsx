@@ -48,7 +48,7 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
     const isPaid = (totals.due_amount || 0) <= 0;
 
     return (
-        <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:w-full print:max-w-none text-[10.5px] leading-snug overflow-hidden">
+        <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:w-full print:max-w-none print:min-h-0 print:overflow-visible text-[10.5px] leading-snug overflow-hidden">
 
             {/* ═══════ HEADER with decorative right panel ═══════ */}
             <div className="flex items-stretch min-h-[110px] relative">
@@ -178,8 +178,8 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                     </div>
                 </div>
 
-                {/* ═══════ ITEMS TABLE + TOTALS (ONE UNIFIED BLOCK) ═══════ */}
-                <div className="border border-slate-200 rounded-xl overflow-hidden mb-3 shadow-2xs">
+                {/* ═══════ ITEMS TABLE ═══════ */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden mb-3 shadow-2xs print:overflow-visible print:rounded-none">
                     <table className="w-full border-collapse text-[9.5px]">
                         <thead className="bg-[#024282] text-white font-bold text-[8.5px] uppercase tracking-wider">
                             <tr>
@@ -224,9 +224,10 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                             ))}
                         </tbody>
                     </table>
+                </div>
 
-                    {/* ── GST Tax Summary + Totals ── */}
-                    <div className="border-t border-slate-200 grid grid-cols-12">
+                {/* ── GST Tax Summary + Totals ── */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden mb-3 shadow-2xs break-inside-avoid print:break-inside-avoid grid grid-cols-12">
                         {/* GST Tax Summary — left 7 cols */}
                         <div className="col-span-7 bg-slate-50/80 p-2.5 border-r border-slate-200">
                             <p className="font-black text-[#024282] uppercase text-[9px] tracking-wider mb-1.5">GST TAX SUMMARY</p>
@@ -278,10 +279,9 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                             </div>
                         </div>
                     </div>
-                </div>
 
                 {/* ═══════ AMOUNT IN WORDS & PAYMENT STATUS ═══════ */}
-                <div className="grid grid-cols-12 gap-3 mb-4">
+                <div className="grid grid-cols-12 gap-3 mb-4 break-inside-avoid print:break-inside-avoid">
                     <div className="col-span-7 bg-slate-50/80 border border-slate-200 rounded-xl p-3 flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center flex-shrink-0">
                             <FileText className="w-4 h-4" />
@@ -310,7 +310,7 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                 </div>
 
                 {/* ═══════ 3 CARDS ROW (BANK DETAILS, UPI PAYMENT, CONTACT) ═══════ */}
-                <div className="grid grid-cols-12 gap-3 mb-4">
+                <div className="grid grid-cols-12 gap-3 mb-4 break-inside-avoid print:break-inside-avoid">
                     {/* Bank Details */}
                     <div className="col-span-5 bg-slate-50/80 border border-slate-200 rounded-xl p-3 text-[10px]">
                         <div className="flex items-center gap-1.5 text-[#024282] font-black uppercase text-[10px] mb-2 border-b border-slate-200/60 pb-1">
@@ -357,7 +357,7 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
                 </div>
 
                 {/* ═══════ DECLARATION & SIGNATURE ═══════ */}
-                <div className="grid grid-cols-12 gap-6 pt-3 border-t border-slate-200 text-[10px]">
+                <div className="grid grid-cols-12 gap-6 pt-3 border-t border-slate-200 text-[10px] break-inside-avoid print:break-inside-avoid">
                     <div className="col-span-7 space-y-1">
                         <div className="flex items-center gap-1.5 mb-1">
                             <FileText className="w-3.5 h-3.5 text-[#024282]" />
@@ -383,7 +383,7 @@ const IndiaInvoiceLayout = ({ invoice, shop, calculation }) => {
             </div>
 
             {/* ═══════ FOOTER BAR ═══════ */}
-            <div className="bg-[#024282] text-white p-3 flex justify-between items-center text-[9px] font-bold">
+            <div className="bg-[#024282] text-white p-3 flex justify-between items-center text-[9px] font-bold break-inside-avoid print:break-inside-avoid">
                 <span>Thank you for your business!</span>
                 <div className="flex items-center gap-1">
                     <span>Powered by</span>

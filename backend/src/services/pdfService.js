@@ -3,7 +3,7 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { createQRMatrix, matrixToBMPBuffer } = require('../utils/qrGenerator');
+const QRCode = require('qrcode');
 const { calculateInvoice } = require('../utils/invoiceCalculationEngine');
 const { getCountryConfig, resolveIndianState } = require('../config/countryConfig');
 const { renderInvoiceToHTML } = require('./ssrInvoiceRenderer');
@@ -50,6 +50,12 @@ function setStroke(doc, hex) {
 
 // Helper to resolve available Chrome / Chromium binary
 function getChromeBinary() {
+    if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
+        return process.env.CHROME_PATH;
+    }
+    if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+        return process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
     const candidates = [
         'google-chrome',
         'google-chrome-stable',
@@ -130,7 +136,65 @@ const generateInvoicePDF = async (invoice, shop) => {
 // ─── PDFKit Fallback Generator ─────────────────────────────────────────────
 // Three modular country-specific renderers that match the approved invoice designs.
 
-const generateInvoicePDFKit = (invoice, shop) => {
+const generateInvoicePDFKit = async (invoice, shop) => {
+    const country = invoice.country || shop?.country || 'AE';
+
+    // Run Authoritative Calculation Engine
+    const calculation = calculateInvoice({
+        items: invoice.items || [],
+        shop: { ...shop, country },
+        globalDiscount: invoice.discount || 0,
+        paidAmount: invoice.paid_amount || 0,
+        sellerState: invoice.seller_address_snapshot || shop?.address || '',
+        buyerState: invoice.place_of_supply_state || invoice.customer_address || '',
+        reverseCharge: Boolean(invoice.reverse_charge)
+    });
+
+    const { items: calcItems, totals, meta } = calculation;
+    const currency = meta.currency;
+    const decimals = currency === 'KWD' ? 3 : 2;
+    const dateStr = formatDate(invoice.date);
+    const timeStr = invoice.date
+        ? new Date(invoice.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        : new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    const sellerName = invoice.seller_name_snapshot || shop?.name || 'Hisabi Store';
+    const sellerAddress = invoice.seller_address_snapshot || shop?.address || '';
+    const sellerPhone = invoice.seller_phone_snapshot || shop?.phone || '';
+    const sellerEmail = invoice.seller_email_snapshot || shop?.email || '';
+    const customerName = invoice.customer_name || 'Walk-in Customer';
+    const customerPhone = invoice.customer_phone || '';
+    const customerEmail = invoice.customer_email || '';
+    const customerAddress = invoice.customer_address || '';
+    const paymentMethod = (invoice.payment_method || 'CASH').toUpperCase();
+    const isPaid = (totals.due_amount || 0) <= 0;
+    const financeCompany = invoice.finance_company || null;
+    const invNum = `#INV-${String(invoice.invoice_number || '1').padStart(6, '0')}`;
+    const bank = invoice.bank_details_snapshot || (shop?.bank_name ? {
+        bank_name: shop.bank_name,
+        account_number: shop.bank_account_number,
+        iban_ifsc: shop.bank_iban_ifsc
+    } : {});
+    const invoiceNotes = invoice.notes || shop?.invoice_notes || '';
+    const invoiceDeclaration = invoice.declaration || shop?.invoice_declaration
+        || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
+
+    const resolvedPlace = resolveIndianState(invoice.place_of_supply_state, invoice.place_of_supply_code);
+    const placeState = resolvedPlace.state || '\u2014';
+    const placeCode = resolvedPlace.code || '\u2014';
+
+    // QR Code PNG Generation (PDFKit only accepts PNG/JPEG, not BMP)
+    let qrBmp = null;
+    const upiId = shop?.upi_id || invoice.upi_id || null;
+    try {
+        const qrRaw = invoice.qr_code_data || (country === 'IN' && upiId
+            ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(sellerName)}&am=${totals.grand_total}&cu=INR`
+            : null);
+        if (qrRaw) {
+            qrBmp = await QRCode.toBuffer(qrRaw, { type: 'png', width: 108, margin: 1 });
+        }
+    } catch (e) { /* Non-fatal — QR omitted if generation fails */ }
+
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({
             size: 'A4',
@@ -146,63 +210,6 @@ const generateInvoicePDFKit = (invoice, shop) => {
         const leftMargin = 30;
         const topMargin = 25;
         const pageWidth = doc.page.width - 60;
-        const country = invoice.country || shop?.country || 'AE';
-
-        // Run Authoritative Calculation Engine
-        const calculation = calculateInvoice({
-            items: invoice.items || [],
-            shop: { ...shop, country },
-            globalDiscount: invoice.discount || 0,
-            paidAmount: invoice.paid_amount || 0,
-            sellerState: invoice.seller_address_snapshot || shop?.address || '',
-            buyerState: invoice.place_of_supply_state || invoice.customer_address || '',
-            reverseCharge: Boolean(invoice.reverse_charge)
-        });
-
-        const { items: calcItems, totals, meta } = calculation;
-        const currency = meta.currency;
-        const decimals = currency === 'KWD' ? 3 : 2;
-        const dateStr = formatDate(invoice.date);
-        const timeStr = invoice.date
-            ? new Date(invoice.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-            : new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-
-        const sellerName = invoice.seller_name_snapshot || shop?.name || 'Hisabi Store';
-        const sellerAddress = invoice.seller_address_snapshot || shop?.address || '';
-        const sellerPhone = invoice.seller_phone_snapshot || shop?.phone || '';
-        const sellerEmail = invoice.seller_email_snapshot || shop?.email || '';
-        const customerName = invoice.customer_name || 'Walk-in Customer';
-        const customerPhone = invoice.customer_phone || '';
-        const customerEmail = invoice.customer_email || '';
-        const customerAddress = invoice.customer_address || '';
-        const paymentMethod = (invoice.payment_method || 'CASH').toUpperCase();
-        const isPaid = (totals.due_amount || 0) <= 0;
-        const financeCompany = invoice.finance_company || null;
-        const invNum = `#INV-${String(invoice.invoice_number || '1').padStart(6, '0')}`;
-        const bank = invoice.bank_details_snapshot || (shop?.bank_name ? {
-            bank_name: shop.bank_name,
-            account_number: shop.bank_account_number,
-            iban_ifsc: shop.bank_iban_ifsc
-        } : {});
-        const invoiceNotes = invoice.notes || shop?.invoice_notes || '';
-        const invoiceDeclaration = invoice.declaration || shop?.invoice_declaration
-            || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
-
-        const resolvedPlace = resolveIndianState(invoice.place_of_supply_state, invoice.place_of_supply_code);
-        const placeState = resolvedPlace.state || '\u2014';
-        const placeCode = resolvedPlace.code || '\u2014';
-
-        // QR Code BMP Generation
-        let qrBmp = null;
-        try {
-            const qrRaw = invoice.qr_code_data || (country === 'IN'
-                ? `upi://pay?pa=${shop?.upi_id || 'hisabi@upi'}&pn=${encodeURIComponent(sellerName)}&am=${totals.grand_total}&cu=INR`
-                : country === 'KW'
-                    ? `https://knet.com.kw/pay?inv=${invoice.invoice_number}&amt=${totals.grand_total}`
-                    : `https://hisabi.com/verify?inv=${invoice.invoice_number}`);
-            const matrix = createQRMatrix(qrRaw);
-            qrBmp = matrixToBMPBuffer(matrix, 3, 3);
-        } catch (e) { /* Non-fatal */ }
 
         // ─── Shared Drawing Helpers ───────────────────────────────────────────
         const fmt = (val) => parseFloat(val || 0).toFixed(decimals);
@@ -513,10 +520,13 @@ function _drawIndiaInvoice(ctx) {
     const b2X = leftMargin + b1W + 8;
     drawCard(b2X, curY2, b2W, bH);
     drawCardLabel('UPI Payment', b2X + 8, curY2 + 5);
-    doc.fontSize(8).font('Helvetica'); setColor(doc, TEXT_MUTED);
-    doc.text('Scan to Pay', b2X + 8, curY2 + 16, { width: b2W - 16, align: 'center' });
     if (qrBmp) {
-        try { doc.image(qrBmp, b2X + (b2W - 36) / 2, curY2 + 26, { width: 36, height: 36 }); } catch (e) { /* skip */ }
+        doc.fontSize(7.5).font('Helvetica'); setColor(doc, TEXT_MUTED);
+        doc.text('Scan to Pay', b2X + 8, curY2 + 16, { width: b2W - 16, align: 'center' });
+        try { doc.image(qrBmp, b2X + (b2W - 36) / 2, curY2 + 25, { width: 36, height: 36 }); } catch (e) { /* skip */ }
+    } else {
+        doc.fontSize(7.5).font('Helvetica'); setColor(doc, TEXT_MUTED);
+        doc.text('UPI Not Configured', b2X + 8, curY2 + 28, { width: b2W - 16, align: 'center' });
     }
 
     const b3X = b2X + b2W + 8;
@@ -742,17 +752,20 @@ function _drawUAEInvoice(ctx) {
     };
     _bk2('Bank Name:', bank.bank_name || '\u2014');
     _bk2('A/C No.:', bank.account_number || '\u2014');
-    _bk2('Branch/IFSC:', bank.iban_ifsc || '\u2014');
+    _bk2('Identifier:', bank.iban_ifsc || '\u2014');
 
     const b2X = leftMargin + b1W + 8;
     drawCard(b2X, curY2, b2W, bH);
     doc.fontSize(8).font('Helvetica-Bold'); setColor(doc, NAVY);
-    doc.text('QR / Payment', b2X + 8, curY2 + 5, { width: b2W - 16, align: 'center' });
+    doc.text('QR Code', b2X + 8, curY2 + 5, { width: b2W - 16, align: 'center' });
     if (qrBmp) {
         try { doc.image(qrBmp, b2X + (b2W - 36) / 2, curY2 + 16, { width: 36, height: 36 }); } catch (e) { /* skip */ }
+        doc.fontSize(7.5).font('Helvetica'); setColor(doc, TEXT_MUTED);
+        doc.text('Scan Code', b2X + 8, curY2 + 54, { width: b2W - 16, align: 'center' });
+    } else {
+        doc.fontSize(7.5).font('Helvetica'); setColor(doc, TEXT_MUTED);
+        doc.text('No QR Data', b2X + 8, curY2 + 28, { width: b2W - 16, align: 'center' });
     }
-    doc.fontSize(7.5).font('Helvetica'); setColor(doc, TEXT_MUTED);
-    doc.text('Scan to Pay via UPI', b2X + 8, curY2 + 50, { width: b2W - 16, align: 'center' });
 
     const b3X = b2X + b2W + 8;
     drawCard(b3X, curY2, b3W, bH);
@@ -761,7 +774,7 @@ function _drawUAEInvoice(ctx) {
     doc.fontSize(8).font('Helvetica'); setColor(doc, TEXT_MUTED);
     if (sellerPhone) { doc.text(sellerPhone, b3X + 8, qY, { width: b3W - 16 }); qY += 10; }
     if (sellerEmail) { doc.text(sellerEmail, b3X + 8, qY, { width: b3W - 16 }); qY += 10; }
-    doc.fontSize(7.5).text('Scan QR or pay via UPI for faster and safer transactions.', b3X + 8, qY, { width: b3W - 16 });
+    doc.fontSize(7.5).text('For billing questions or assistance, contact us.', b3X + 8, qY, { width: b3W - 16 });
 
     curY2 += bH + 8;
 
@@ -959,19 +972,22 @@ function _drawKuwaitInvoice(ctx) {
         doc.text(val || '\u2014', leftMargin + 72, bkY, { width: b1W - 80 });
         bkY += 10;
     };
-    _bk3('Bank Name:', bank.bank_name || 'Kuwait Finance House');
+    _bk3('Bank Name:', bank.bank_name || '\u2014');
     _bk3('A/C No.:', bank.account_number || '\u2014');
-    _bk3('Branch/IBAN:', bank.iban_ifsc || '\u2014');
+    _bk3('Identifier:', bank.iban_ifsc || '\u2014');
 
     const b2X = leftMargin + b1W + 8;
     drawCard(b2X, curY2, b2W, bH);
     doc.fontSize(8).font('Helvetica-Bold'); setColor(doc, NAVY);
-    doc.text('Scan to Pay / امسح للدفع', b2X + 8, curY2 + 5, { width: b2W - 16, align: 'center' });
+    doc.text('QR Code / رمز الاستجابة', b2X + 8, curY2 + 5, { width: b2W - 16, align: 'center' });
     if (qrBmp) {
         try { doc.image(qrBmp, b2X + (b2W - 36) / 2, curY2 + 16, { width: 36, height: 36 }); } catch (e) { /* skip */ }
+        doc.fontSize(7.5).font('Helvetica'); setColor(doc, TEXT_MUTED);
+        doc.text('Scan Code', b2X + 8, curY2 + 54, { width: b2W - 16, align: 'center' });
+    } else {
+        doc.fontSize(7.5).font('Helvetica'); setColor(doc, TEXT_MUTED);
+        doc.text('No QR Data', b2X + 8, curY2 + 28, { width: b2W - 16, align: 'center' });
     }
-    doc.fontSize(7.5).font('Helvetica'); setColor(doc, TEXT_MUTED);
-    doc.text('KNET  |  VISA  |  Mastercard', b2X + 8, curY2 + 52, { width: b2W - 16, align: 'center' });
 
     const b3X = b2X + b2W + 8;
     drawCard(b3X, curY2, b3W, bH);

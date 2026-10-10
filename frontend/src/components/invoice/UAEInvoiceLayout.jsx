@@ -45,11 +45,11 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
         account_number: shop.bank_account_number,
         iban_ifsc: shop.bank_iban_ifsc
     } : {});
-    const qrData = invoice.qr_code_data || `https://hisabi.com/verify?inv=${invoice.invoice_number}&trn=${trn}`;
+    const qrData = invoice.qr_code_data || null;
     const invoiceDeclaration = invoice.declaration || shop?.invoice_declaration || 'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.';
 
     return (
-        <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white p-8 box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:p-6 print:w-full print:max-w-none text-[11px] leading-tight">
+        <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white p-8 box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:p-6 print:w-full print:max-w-none print:overflow-visible text-[11px] leading-tight">
 
             {/* ═══════ HEADER ═══════ */}
             <div className="flex justify-between items-start pb-5 border-b border-slate-200">
@@ -167,7 +167,8 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
             </div>
 
             {/* ═══════ ITEMS TABLE ═══════ */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden mb-4 shadow-2xs">
+            {/* Table wrapper: allow page breaks between rows */}
+            <div className="border border-slate-200 rounded-xl print:overflow-visible mb-0 shadow-2xs">
                 <table className="w-full border-collapse text-[10px]">
                     <thead className="bg-[#024282] text-white font-bold text-[9px] tracking-wider text-center">
                         <tr className="border-b border-[#1a5b9e]">
@@ -239,9 +240,11 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
                         })}
                     </tbody>
                 </table>
+            </div>
 
-                {/* ── Amount in Words + Totals ── */}
-                <div className="border-t border-slate-200 grid grid-cols-12 bg-slate-50/80">
+            {/* ══ Amount in Words + Totals ─ separate block so it stays together but doesn't trap the table */}
+            <div className="border border-t-0 border-slate-200 rounded-b-xl mb-4 shadow-2xs bg-slate-50/80 break-inside-avoid">
+                <div className="grid grid-cols-12">
                     {/* Amount in Words — left 7 cols */}
                     <div className="col-span-7 p-3 border-r border-slate-200 flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center flex-shrink-0">
@@ -331,24 +334,23 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
                     <div className="space-y-1 text-slate-700">
                         <p><span className="text-slate-400">Bank Name :</span> <span className="font-bold text-slate-800">{bank.bank_name || '—'}</span></p>
                         <p><span className="text-slate-400">A/C No. :</span> <span className="font-mono font-bold text-slate-800">{bank.account_number || '—'}</span></p>
-                        <p><span className="text-slate-400">Branch & IFSC :</span> <span className="font-mono font-bold text-slate-800">{bank.iban_ifsc || '—'}</span></p>
+                        <p><span className="text-slate-400">Account / Branch Identifier :</span> <span className="font-mono font-bold text-slate-800">{bank.iban_ifsc || '—'}</span></p>
                     </div>
                 </div>
 
-                {/* QR / Payment */}
+                {/* QR Code */}
                 <div className="col-span-3 bg-slate-50/80 border border-slate-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
-                    <span className="font-black text-[#024282] uppercase text-[9px] tracking-wider mb-1.5">QR / Payment</span>
+                    <span className="font-black text-[#024282] uppercase text-[9px] tracking-wider mb-1.5">
+                        QR Code / <span dir="rtl" className="font-normal text-[8px]">رمز الاستجابة</span>
+                    </span>
                     <QRCodeImage
                         text={qrData}
-                        alt="ZATCA QR"
+                        alt="Invoice QR"
                         containerClassName="w-16 h-16 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs flex-shrink-0 flex items-center justify-center mb-1"
                         unavailableText="QR Unavailable"
                         unavailableSubtext="No QR Data"
                     />
-                    <span className="text-[8px] text-slate-500 font-bold">Scan to Pay via UPI</span>
-                    <div className="mt-1 flex items-center gap-1">
-                        <span className="px-1.5 py-0.5 bg-[#5f259f] text-white rounded text-[7px] font-black">UPI</span>
-                    </div>
+                    <span className="text-[8px] text-slate-500 font-bold">{qrData ? 'Scan Code / امسح الرمز' : 'No QR Data'}</span>
                 </div>
 
                 {/* For any queries */}
@@ -365,7 +367,7 @@ const UAEInvoiceLayout = ({ invoice, shop, calculation }) => {
                         {!sellerPhone && <p className="text-slate-400 text-[9px]">[PHONE NUMBER]</p>}
                         {!sellerEmail && <p className="text-slate-400 text-[9px]">[EMAIL ID]</p>}
                         <p className="text-[8.5px] text-slate-500 mt-1 leading-snug">
-                            Scan QR or pay via UPI for faster and safer transactions.
+                            For billing questions or assistance, please reach out via phone or email.
                         </p>
                     </div>
                 </div>

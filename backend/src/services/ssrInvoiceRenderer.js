@@ -32,8 +32,12 @@ const PRINT_CSS = `
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  @page { size: A4; margin: 0; }
+  @page { size: A4 portrait; margin: 0; }
   body  { margin: 0; padding: 0; background: #fff; }
+  table { break-inside: auto !important; page-break-inside: auto !important; }
+  thead { display: table-header-group !important; }
+  tr    { break-inside: avoid !important; page-break-inside: avoid !important; }
+  .avoid-break { break-inside: avoid !important; page-break-inside: avoid !important; }
 `;
 
 // ── Babel register (transpile JSX / ES modules on-the-fly) ──────────────────
@@ -84,6 +88,7 @@ function ServerQRCodeImage({ text, alt = 'QR Code', className, containerClassNam
 //    2. react / react/jsx-runtime / react-dom → backend's copies
 //       This prevents the "two React instances" error where frontend JSX elements
 //       created with frontend's React are rendered by backend's react-dom/server.
+//    3. lucide-react → backend copy or frontend copy, with fallback SVG proxy
 const Module = require('module');
 const _origLoad = Module._load.bind(Module);
 let _patchApplied = false;
@@ -113,6 +118,32 @@ function applyModulePatch() {
                 ? BACKEND_REACT_DOM
                 : path.join(BACKEND_REACT_DOM, 'server');
             return _origLoad(resolved, parent, isMain);
+        }
+        // Robust lucide-react resolution
+        if (request === 'lucide-react') {
+            try {
+                return _origLoad('lucide-react', parent, isMain);
+            } catch (e) {
+                try {
+                    const feLucide = path.resolve(FRONTEND_ROOT, '../node_modules/lucide-react');
+                    return _origLoad(feLucide, parent, isMain);
+                } catch (e2) {
+                    const React = require('react');
+                    return new Proxy({}, {
+                        get: (_, prop) => {
+                            if (prop === '__esModule') return true;
+                            return (props) => React.createElement('svg', {
+                                ...props,
+                                'data-icon': String(prop),
+                                viewBox: '0 0 24 24',
+                                fill: 'none',
+                                stroke: 'currentColor',
+                                strokeWidth: 2
+                            });
+                        }
+                    });
+                }
+            }
         }
         return _origLoad(request, parent, isMain);
     };

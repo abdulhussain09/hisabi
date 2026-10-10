@@ -318,9 +318,9 @@ const Invoices = () => {
     );
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 p-6 lg:p-10 max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-6 animate-in fade-in duration-500 p-6 lg:p-10 max-w-7xl mx-auto print:p-0 print:max-w-none print:space-y-0">
+            {/* Header — hidden when printing invoice */}
+            <div className={`flex flex-col md:flex-row md:items-end justify-between gap-6 ${viewingInvoice ? 'print:hidden' : ''}`}>
                 <div className="space-y-1">
                     <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-slate-900 rounded-[1.25rem] flex items-center justify-center text-white shadow-xl shadow-slate-900/10">
@@ -349,9 +349,9 @@ const Invoices = () => {
 
             {/* View A4 Modal */}
             {viewingInvoice && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-slate-100 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl">
-                        <div className="flex justify-between items-center mb-4 no-print">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto print:static print:inset-auto print:bg-transparent print:backdrop-blur-none print:z-auto print:flex-none print:p-0 print:overflow-visible print:block">
+                    <div className="bg-slate-100 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 relative shadow-2xl print:bg-white print:rounded-none print:max-w-none print:max-h-none print:overflow-visible print:p-0 print:shadow-none print:relative print:w-full">
+                        <div className="flex justify-between items-center mb-4 print:hidden">
                             <h3 className="text-base font-black text-slate-900">
                                 Invoice #{String(viewingInvoice.invoice_number).padStart(5, '0')} Document
                             </h3>
@@ -377,7 +377,7 @@ const Invoices = () => {
 
             {/* ── History Retention Warning (Non-Premium) ── */}
             {!isPremium && (
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-[2rem] p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-[2rem] p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm print:hidden">
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center flex-shrink-0">
                             <Clock className="w-6 h-6 text-orange-500" />
@@ -397,7 +397,7 @@ const Invoices = () => {
             )}
 
             {/* Main Table Card */}
-            <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden print:hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
@@ -498,6 +498,7 @@ const Invoices = () => {
             <PricingModal
                 isOpen={isPricingModalOpen}
                 onClose={() => setIsPricingModalOpen(false)}
+                className="print:hidden"
             />
         </div>
     );

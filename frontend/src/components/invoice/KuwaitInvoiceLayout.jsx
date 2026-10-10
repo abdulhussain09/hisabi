@@ -44,12 +44,12 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
         iban_ifsc: shop.bank_iban_ifsc
     } : {});
 
-    const qrData = invoice.qr_code_data || `https://knet.com.kw/pay?inv=${invoice.invoice_number}&amt=${totals.grand_total}`;
+    const qrData = invoice.qr_code_data || null;
     const invoiceNotes = invoice.notes || shop?.invoice_notes || '';
     const invoiceDeclaration = invoice.declaration || shop?.invoice_declaration || '';
 
     return (
-        <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white p-8 box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:p-6 print:w-full print:max-w-none text-[11px] leading-tight">
+        <div className="w-[210mm] max-w-[210mm] min-h-[297mm] mx-auto bg-white p-8 box-border text-slate-900 font-sans shadow-lg print:shadow-none print:m-0 print:p-6 print:w-full print:max-w-none print:overflow-visible text-[11px] leading-tight">
 
             {/* ═══════ HEADER ═══════ */}
             <div className="flex justify-between items-start pb-5 border-b border-slate-200">
@@ -181,7 +181,7 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
             </div>
 
             {/* ═══════ ITEMS TABLE (6 COLUMNS) ═══════ */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden mb-3 shadow-2xs">
+            <div className="border border-slate-200 rounded-xl print:overflow-visible mb-3 shadow-2xs">
                 <table className="w-full border-collapse text-[10px]">
                     <thead className="bg-[#024282] text-white font-bold text-[9px] tracking-wider">
                         <tr className="border-b border-[#1a5b9e]">
@@ -222,7 +222,7 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
             </div>
 
             {/* ═══════ PAYMENT STATUS (LEFT) & TOTALS (RIGHT) ═══════ */}
-            <div className="grid grid-cols-12 gap-3 mb-3">
+            <div className="grid grid-cols-12 gap-3 mb-3 break-inside-avoid">
                 {/* Left: Payment Status */}
                 <div className="col-span-6 border border-slate-200/90 rounded-xl p-3 bg-slate-50/60 flex flex-col justify-between">
                     <div className="flex items-center justify-between">
@@ -270,7 +270,7 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
             </div>
 
             {/* ═══════ AMOUNT IN WORDS (STANDALONE CARD) ═══════ */}
-            <div className="border border-slate-200/90 rounded-xl p-3 mb-3 bg-slate-50/60 flex items-start gap-3">
+            <div className="border border-slate-200/90 rounded-xl p-3 mb-3 bg-slate-50/60 flex items-start gap-3 break-inside-avoid">
                 <div className="w-7 h-7 rounded-lg bg-[#024282] text-white flex items-center justify-center shrink-0 mt-0.5">
                     <FileText className="w-4 h-4" />
                 </div>
@@ -294,40 +294,25 @@ const KuwaitInvoiceLayout = ({ invoice, shop, calculation }) => {
                         <span>Bank Details / <span dir="rtl" className="font-normal font-arabic">تفاصيل البنك</span></span>
                     </div>
                     <div className="space-y-1 text-slate-700">
-                        <p><span className="text-slate-400">Bank Name / <span dir="rtl">اسم البنك</span>:</span> <span className="font-bold text-slate-800">{bank.bank_name || 'Kuwait Finance House'}</span></p>
-                        <p><span className="text-slate-400">A/C No. / <span dir="rtl">رقم الحساب</span>:</span> <span className="font-mono font-bold text-slate-800">{bank.account_number || '1234 5678 9012'}</span></p>
-                        <p><span className="text-slate-400">Branch & IFSC / <span dir="rtl">الفرع ورمز التحويل</span>:</span> <span className="font-mono font-bold text-slate-800">{bank.iban_ifsc || 'Salmiya Branch / KFHKWKWXXX'}</span></p>
+                        <p><span className="text-slate-400">Bank Name / <span dir="rtl">اسم البنك</span>:</span> <span className="font-bold text-slate-800">{bank.bank_name || '—'}</span></p>
+                        <p><span className="text-slate-400">A/C No. / <span dir="rtl">رقم الحساب</span>:</span> <span className="font-mono font-bold text-slate-800">{bank.account_number || '—'}</span></p>
+                        <p><span className="text-slate-400">Account / Branch Identifier / <span dir="rtl">معرف الحساب أو الفرع</span>:</span> <span className="font-mono font-bold text-slate-800">{bank.iban_ifsc || '—'}</span></p>
                     </div>
                 </div>
 
-                {/* Scan to Pay */}
+                {/* QR Code */}
                 <div className="col-span-3 bg-slate-50/80 border border-slate-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
                     <span className="font-black text-[#024282] uppercase text-[9px] tracking-wider mb-1">
-                        Scan to Pay / <span dir="rtl" className="font-normal font-arabic">امسح للدفع</span>
+                        QR Code / <span dir="rtl" className="font-normal font-arabic">رمز الاستجابة</span>
                     </span>
                     <QRCodeImage
                         text={qrData}
-                        alt="Scan to Pay QR"
+                        alt="Invoice QR"
                         containerClassName="w-16 h-16 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs mb-1 flex items-center justify-center"
                         unavailableText="QR Unavailable"
-                        unavailableSubtext="No Payment Link"
+                        unavailableSubtext="No QR Data"
                     />
-                    <span className="text-[7.5px] text-slate-400">Pay securely with</span>
-                    <div className="flex items-center gap-1.5 mt-1">
-                        {/* K-Net Badge */}
-                        <div className="px-1.5 py-0.5 bg-[#005ba4] text-white rounded font-black text-[7px] tracking-tight">
-                            KNET
-                        </div>
-                        {/* VISA Badge */}
-                        <div className="px-1.5 py-0.5 bg-[#1a1f71] text-white rounded font-black text-[7px] tracking-tight italic">
-                            VISA
-                        </div>
-                        {/* Mastercard Badge */}
-                        <div className="flex items-center -space-x-1">
-                            <div className="w-3 h-3 rounded-full bg-[#eb001b]"></div>
-                            <div className="w-3 h-3 rounded-full bg-[#f79e1b] opacity-90"></div>
-                        </div>
-                    </div>
+                    <span className="text-[8px] text-slate-500 font-bold">{qrData ? 'Scan Code / امسح الرمز' : 'No QR Data'}</span>
                 </div>
 
                 {/* Tax / CR Details */}

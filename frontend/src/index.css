@@ -282,9 +282,10 @@
     display: none !important;
   }
   thead {
-    display: table-header-group;
+    display: table-header-group !important;
   }
-  tr, .card, table {
+  tr, .card {
     break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

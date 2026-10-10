@@ -1,0 +1,30 @@
+# Dependency caches
+node_modules
+**/node_modules
+
+# Environment secrets (including nested subfolders)
+.env
+*.env
+**/.env
+**/.env.*
+**/*.env
+!.env.example
+!**/.env.example
+
+# Git metadata
+.git
+.gitignore
+
+# Test artifacts and debug outputs
+backend/test_output
+backend/test_output/*
+scratch/
+coverage/
+
+# IDE, OS, and temporary files
+.DS_Store
+.idea/
+.vscode/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

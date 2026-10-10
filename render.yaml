@@ -1,11 +1,12 @@
 services:
   - type: web
     name: hisabi-api
-    runtime: node
+    runtime: docker
     region: singapore # Or your preferred region
     plan: free
-    buildCommand: npm install && cd backend && npm install
-    startCommand: cd backend && node src/server.js
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production

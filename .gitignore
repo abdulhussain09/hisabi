@@ -27,6 +27,9 @@ backend/uploads/
 *.log
 npm-debug.log*
 
+# Generated test artifacts
+backend/test_output/
+
 # OS files
 .DS_Store
 Thumbs.db
