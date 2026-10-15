@@ -44,3 +44,10 @@ docs/HISABI_COMPLETE_DEVELOPER_GUIDE.md
 
 # Temporary scratch scripts
 scratch/
+
+# Chrome / Puppeteer downloaded browser binaries
+chrome/
+backend/chrome/
+.cache/
+backend/.cache/
+

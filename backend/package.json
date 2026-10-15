@@ -7,7 +7,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node src/server.js",
     "start": "node src/server.js",
-    "build": "echo 'No build step required'"
+    "build": "echo 'No build step required'",
+    "postinstall": "node -e \"if (!require('fs').existsSync('/usr/bin/chromium')) { try { require('child_process').execSync('npx @puppeteer/browsers install chrome@stable', {stdio: 'inherit'}); } catch(e) { console.warn('Puppeteer browser install skipped:', e.message); } }\""
+
   },
   "keywords": [],
   "author": "",
@@ -18,6 +20,7 @@
     "@babel/preset-env": "^8.0.7",
     "@babel/preset-react": "^8.0.1",
     "@babel/register": "^8.0.6",
+    "@puppeteer/browsers": "^2.4.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",

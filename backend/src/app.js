@@ -35,22 +35,31 @@ app.use((req, res, next) => {
     next();
 });
 
-// CORS — allow requests from frontend (Vercel) or localhost in dev
-const allowedOrigins = [
+// CORS — allow requests from frontend (Vercel/Netlify) or localhost in dev
+const rawOrigins = [
     process.env.FRONTEND_URL,
     'https://hisabi-pos.netlify.app',
     'http://localhost:5173',
     'http://localhost:3000',
 ].filter(Boolean);
 
+// Normalize trailing slashes
+const allowedOrigins = rawOrigins.map(o => o.replace(/\/+$/, ''));
+
 app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (e.g. Postman, server-to-server)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
+        const cleanOrigin = origin.replace(/\/+$/, '');
+        if (allowedOrigins.includes(cleanOrigin) ||
+            cleanOrigin.endsWith('.netlify.app') ||
+            cleanOrigin.endsWith('.vercel.app')) {
+            return callback(null, true);
+        }
         callback(new Error(`CORS: Origin ${origin} not allowed`));
     },
     credentials: true,
+    exposedHeaders: ['Content-Disposition', 'Content-Length']
 }));
 
 // Middleware - ORDER MATTERS

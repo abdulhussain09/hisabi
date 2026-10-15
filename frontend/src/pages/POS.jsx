@@ -414,8 +414,15 @@ const POS = () => {
                                 onClick={async () => {
                                     try {
                                         const res = await api.get(`/invoices/${invoice.id}/pdf`, { responseType: 'blob' });
-                                        const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-                                        window.open(url, '_blank');
+                                        const blob = new Blob([res.data], { type: 'application/pdf' });
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = `invoice-${invoice.invoice_number || invoice.id}.pdf`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        setTimeout(() => URL.revokeObjectURL(url), 2000);
                                     } catch (err) {
                                         alert(t('invoices.errors.download_failed'));
                                     }

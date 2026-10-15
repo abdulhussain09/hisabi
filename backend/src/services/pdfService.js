@@ -38,6 +38,27 @@ function setStroke(doc, hex) {
 
 // ─── Chrome Headless PDF Generator (Exact Visual Parity) ───────────────────
 
+// Helper to recursively locate a Chrome or Chromium executable within a folder
+function findChromeInDir(dir, depth = 0) {
+    if (depth > 5 || !fs.existsSync(dir)) return null;
+    try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                const found = findChromeInDir(fullPath, depth + 1);
+                if (found) return found;
+            } else if (entry.isFile() && (entry.name === 'chrome' || entry.name === 'chromium' || entry.name === 'chrome-headless-shell')) {
+                try {
+                    fs.accessSync(fullPath, fs.constants.X_OK);
+                    return fullPath;
+                } catch {}
+            }
+        }
+    } catch {}
+    return null;
+}
+
 // Helper to resolve available Chrome / Chromium binary with environment and filesystem checks
 function getChromeBinary() {
     if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
@@ -46,16 +67,20 @@ function getChromeBinary() {
     if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
         return process.env.PUPPETEER_EXECUTABLE_PATH;
     }
+
+    // Standard distribution candidate paths
     const candidates = [
         '/usr/bin/chromium',
         '/usr/bin/google-chrome',
         '/usr/bin/google-chrome-stable',
         '/usr/bin/chromium-browser',
+        '/snap/bin/chromium',
         'chromium',
         'google-chrome',
         'google-chrome-stable',
         'chromium-browser'
     ];
+
     for (const bin of candidates) {
         if (bin.startsWith('/')) {
             if (fs.existsSync(bin)) return bin;
@@ -66,6 +91,22 @@ function getChromeBinary() {
             } catch {}
         }
     }
+
+    // Check Puppeteer and local Chrome cache paths (e.g. Render native Node environments)
+    const cacheDirs = [
+        path.join(os.homedir(), '.cache', 'puppeteer'),
+        '/opt/render/.cache/puppeteer',
+        path.join(process.cwd(), '.cache', 'puppeteer'),
+        path.join(__dirname, '../../.cache/puppeteer'),
+        path.join(process.cwd(), 'chrome'),
+        path.join(__dirname, '../../chrome')
+    ];
+
+    for (const cDir of cacheDirs) {
+        const found = findChromeInDir(cDir);
+        if (found) return found;
+    }
+
     return null;
 }
 
@@ -97,9 +138,12 @@ async function generateInvoicePDFWithChrome(invoice, shop) {
 
     return new Promise((resolve, reject) => {
         const cmd = `"${chromeBin}" --headless=new --disable-gpu --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --no-pdf-header-footer --user-data-dir="${userDataDir}" --print-to-pdf="${tmpPdf}" "file://${tmpHtml}"`;
-        exec(cmd, { timeout: 30000 }, async (error) => {
+        exec(cmd, { timeout: 30000, maxBuffer: 10 * 1024 * 1024 }, async (error, stdout, stderr) => {
             try {
-                if (error) throw error;
+                if (error) {
+                    console.error('[PDF] Chromium generation error:', error.message, 'stderr:', stderr);
+                    throw new Error(`Chromium execution failed: ${error.message}`);
+                }
                 const buffer = await fs.promises.readFile(tmpPdf);
                 cleanup();
                 resolve(buffer);
