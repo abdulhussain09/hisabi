@@ -38,82 +38,82 @@ function setStroke(doc, hex) {
 
 // ─── Chrome Headless PDF Generator (Exact Visual Parity) ───────────────────
 
-// Helper to recursively locate a Chrome or Chromium executable within a folder
-function findChromeInDir(dir, depth = 0) {
-    if (depth > 5 || !fs.existsSync(dir)) return null;
-    try {
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
-        for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-                const found = findChromeInDir(fullPath, depth + 1);
-                if (found) return found;
-            } else if (entry.isFile() && (entry.name === 'chrome' || entry.name === 'chromium' || entry.name === 'chrome-headless-shell')) {
-                try {
-                    fs.accessSync(fullPath, fs.constants.X_OK);
-                    return fullPath;
-                } catch {}
-            }
-        }
-    } catch {}
-    return null;
+const puppeteer = require('puppeteer-core');
+let chromiumModule = null;
+try {
+    const rawChromium = require('@sparticuz/chromium');
+    chromiumModule = rawChromium.default || rawChromium;
+} catch (e) {
+    console.warn('[PDF] @sparticuz/chromium module not loaded:', e.message);
 }
 
-// Helper to resolve available Chrome / Chromium binary with environment and filesystem checks
-function getChromeBinary() {
+// Helper to resolve available Chromium / Chrome binary and launch configuration
+async function getChromiumLaunchConfig() {
+    // 1. Explicit environment variables
     if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
-        return process.env.CHROME_PATH;
+        return {
+            executablePath: process.env.CHROME_PATH,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
+            headless: true
+        };
     }
     if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
-        return process.env.PUPPETEER_EXECUTABLE_PATH;
+        return {
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
+            headless: true
+        };
     }
 
-    // Standard distribution candidate paths
+    // 2. System binary installed via Docker / apt-get (/usr/bin/chromium)
+    if (fs.existsSync('/usr/bin/chromium')) {
+        return {
+            executablePath: '/usr/bin/chromium',
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
+            headless: true
+        };
+    }
+
+    // 3. Serverless / Render native Node runtime via @sparticuz/chromium (bundles all required shared libs)
+    if (chromiumModule && typeof chromiumModule.executablePath === 'function') {
+        try {
+            const execPath = await chromiumModule.executablePath();
+            if (execPath && fs.existsSync(execPath)) {
+                return {
+                    executablePath: execPath,
+                    args: chromiumModule.args || ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+                    headless: chromiumModule.headless !== undefined ? chromiumModule.headless : true
+                };
+            }
+        } catch (e) {
+            console.warn('[PDF] @sparticuz/chromium executable resolution failed:', e.message);
+        }
+    }
+
+    // 4. Other standard Linux distribution candidate paths
     const candidates = [
-        '/usr/bin/chromium',
         '/usr/bin/google-chrome',
         '/usr/bin/google-chrome-stable',
         '/usr/bin/chromium-browser',
-        '/snap/bin/chromium',
-        'chromium',
-        'google-chrome',
-        'google-chrome-stable',
-        'chromium-browser'
+        '/snap/bin/chromium'
     ];
-
     for (const bin of candidates) {
-        if (bin.startsWith('/')) {
-            if (fs.existsSync(bin)) return bin;
-        } else {
-            try {
-                const stdout = require('child_process').execSync(`which ${bin}`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
-                if (stdout && fs.existsSync(stdout)) return stdout;
-            } catch {}
+        if (fs.existsSync(bin)) {
+            return {
+                executablePath: bin,
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-first-run', '--no-zygote'],
+                headless: true
+            };
         }
-    }
-
-    // Check Puppeteer and local Chrome cache paths (e.g. Render native Node environments)
-    const cacheDirs = [
-        path.join(os.homedir(), '.cache', 'puppeteer'),
-        '/opt/render/.cache/puppeteer',
-        path.join(process.cwd(), '.cache', 'puppeteer'),
-        path.join(__dirname, '../../.cache/puppeteer'),
-        path.join(process.cwd(), 'chrome'),
-        path.join(__dirname, '../../chrome')
-    ];
-
-    for (const cDir of cacheDirs) {
-        const found = findChromeInDir(cDir);
-        if (found) return found;
     }
 
     return null;
 }
 
 async function generateInvoicePDFWithChrome(invoice, shop) {
-    const chromeBin = getChromeBinary();
-    if (!chromeBin) {
-        throw new Error('Chromium/Chrome binary not found. Please install Chromium or configure CHROME_PATH.');
+    const config = await getChromiumLaunchConfig();
+    if (!config || !config.executablePath) {
+        throw new Error('Chromium/Chrome executable not found. Please install Chromium or configure CHROME_PATH.');
     }
 
     const plainInvoice = typeof invoice?.toJSON === 'function' ? invoice.toJSON() : invoice;
@@ -123,36 +123,28 @@ async function generateInvoicePDFWithChrome(invoice, shop) {
     // is pixel-perfect identical to the browser preview.
     const html = await renderInvoiceToHTML(plainInvoice, plainShop);
 
-    // Use separate dirs: one for HTML/PDF output, one for Chrome user-data
-    const workDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hisabi_chrome_'));
-    const userDataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'hisabi_ud_'));
-    const tmpHtml = path.join(workDir, 'invoice.html');
-    const tmpPdf = path.join(workDir, 'invoice.pdf');
-
-    await fs.promises.writeFile(tmpHtml, html, 'utf8');
-
-    const cleanup = () => {
-        fs.rm(workDir, { recursive: true, force: true }, () => {});
-        fs.rm(userDataDir, { recursive: true, force: true }, () => {});
-    };
-
-    return new Promise((resolve, reject) => {
-        const cmd = `"${chromeBin}" --headless=new --disable-gpu --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --no-pdf-header-footer --user-data-dir="${userDataDir}" --print-to-pdf="${tmpPdf}" "file://${tmpHtml}"`;
-        exec(cmd, { timeout: 30000, maxBuffer: 10 * 1024 * 1024 }, async (error, stdout, stderr) => {
-            try {
-                if (error) {
-                    console.error('[PDF] Chromium generation error:', error.message, 'stderr:', stderr);
-                    throw new Error(`Chromium execution failed: ${error.message}`);
-                }
-                const buffer = await fs.promises.readFile(tmpPdf);
-                cleanup();
-                resolve(buffer);
-            } catch (err) {
-                cleanup();
-                reject(err);
-            }
-        });
+    const browser = await puppeteer.launch({
+        args: config.args,
+        defaultViewport: { width: 794, height: 1123, deviceScaleFactor: 1 },
+        executablePath: config.executablePath,
+        headless: config.headless
     });
+
+    try {
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: 0, right: 0, bottom: 0, left: 0 }
+        });
+        return Buffer.from(pdfBuffer);
+    } catch (err) {
+        console.error('[PDF] Chromium generation error:', err.message);
+        throw new Error(`Chromium execution failed: ${err.message}`);
+    } finally {
+        await browser.close().catch(() => {});
+    }
 }
 
 // ─── Master PDF Generator ────────────────────────────────────────────────────
